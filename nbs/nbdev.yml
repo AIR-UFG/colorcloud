@@ -1,0 +1,9 @@
+project:
+  output-dir: _docs
+
+website:
+  title: "colorcloud"
+  site-url: "https://AIR-UFG.github.io/colorcloud"
+  description: "Research project to investigate the task of lidar point cloud semantic segmentation."
+  repo-branch: main
+  repo-url: "https://github.com/AIR-UFG/colorcloud"
