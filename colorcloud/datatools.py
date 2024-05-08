@@ -14,6 +14,7 @@ from torchvision.transforms import v2
 
 # %% ../nbs/00_datatools.ipynb 3
 class SemanticKITTIDataset(Dataset):
+    "Load the SemanticKITTI data in a pytorch Dataset object. The data is not downloaded automatically."
     def __init__(self, data_path):
         data_path = Path(data_path)
         yaml_path = data_path/"semantic-kitti.yaml"
@@ -59,8 +60,9 @@ class SemanticKITTIDataset(Dataset):
         
         return frame, label
 
-# %% ../nbs/00_datatools.ipynb 4
+# %% ../nbs/00_datatools.ipynb 6
 class SphericalProjectionTransform(nn.Module):
+    "Pytorch transform that turns a point cloud frame and its respective label into spherical projection images."
     def __init__(self, fov_up_deg, fov_down_deg, W, H):
         super().__init__()
         self.fov_up_rad = (fov_up_deg/180.)*np.pi
@@ -112,8 +114,9 @@ class SphericalProjectionTransform(nn.Module):
         
         return reflectance_depth_img, label_img
 
-# %% ../nbs/00_datatools.ipynb 5
+# %% ../nbs/00_datatools.ipynb 7
 class ProjectionVizTransform(nn.Module):
+    "Pytorch transform to preprocess sphererical projection images for proper visualization."
     def __init__(self, color_map_bgr, learning_map_inv):
         super().__init__()
         self.color_map_bgr = color_map_bgr
