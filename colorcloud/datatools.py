@@ -14,7 +14,7 @@ from torchvision.transforms import v2
 
 # %% ../nbs/00_datatools.ipynb 3
 class SemanticKITTIDataset(Dataset):
-    "Load the SemanticKITTI data in a pytorch Dataset object. The data is not downloaded automatically."
+    "Load the SemanticKITTI data in a pytorch Dataset object."
     def __init__(self, data_path):
         data_path = Path(data_path)
         yaml_path = data_path/"semantic-kitti.yaml"
@@ -164,6 +164,7 @@ class ProjectionVizTransform(nn.Module):
         r = self.normalize(frame_img[:,:,3], 0., 1.)
         d = self.normalize(frame_img[:,:,4], 0., 100.)
         normalized_frame_img = np.stack((x, y, z, r, d), axis=-1)
+        normalized_frame_img[mask_img == False] *= 0
         
         label_img[mask_img] = self.learning_map_inv_np[label_img[mask_img]]
         colored_label_img = np.zeros(label_img.shape + (3,))
