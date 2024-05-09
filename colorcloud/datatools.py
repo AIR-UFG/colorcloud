@@ -46,14 +46,15 @@ class SemanticKITTIDataset(Dataset):
         frame_path = self.velodyne_path/(frame_id + '.bin')
         with open(frame_path, 'rb') as f:
             frame = np.fromfile(f, dtype=np.float32).reshape(-1, 4)
-        frame = torch.from_numpy(frame)
+        # frame = torch.from_numpy(frame)
         
         label_path = self.labels_path/(frame_id + '.label')
         with open(label_path, 'rb') as f:
             label = np.fromfile(f, dtype=np.uint32)
             label = label & 0xFFFF
         label = np.vectorize(self.learning_map.get)(label)
-        label = torch.from_numpy(label).int()
+        label = label.astype(int)
+        # label = torch.from_numpy(label)
         
         if self.transform:
             frame, label = self.transform(frame, label)
@@ -76,12 +77,15 @@ class SphericalProjectionTransform(nn.Module):
         scan_xyz = frame[:,:3]
         reflectance = frame[:, 3]
 
+        assert reflectance.max() <= 1.
+        assert reflectance.min() >= 0.
+
         # get depths of all points
-        depth = torch.norm(scan_xyz, dim=1)
+        depth = np.linalg.norm(scan_xyz, 2, axis=1)
         
         # get angles of all points
-        yaw = torch.atan2(scan_xyz[:,1], scan_xyz[:,0])
-        pitch = torch.asin(scan_xyz[:,2] / depth)
+        yaw = np.arctan2(scan_xyz[:,1], scan_xyz[:,0])
+        pitch = np.arcsin(scan_xyz[:,2] / depth)
         
         # get projections in image coords (between [0.0, 1.0])
         proj_x = 0.5 * (yaw / np.pi + 1.0)
@@ -97,42 +101,75 @@ class SphericalProjectionTransform(nn.Module):
         proj_y *= self.H
         
         # round and clamp to use as indices (between [0, W/H - 1])
-        proj_x = torch.floor(proj_x)
-        proj_x = torch.clamp(proj_x, 0, self.W - 1).int()
+        proj_x = np.floor(proj_x)
+        proj_x = np.clip(proj_x, 0, self.W - 1).astype(int)
         
-        proj_y = torch.floor(proj_y)
-        proj_y = torch.clamp(proj_y, 0, self.H - 1).int()
+        proj_y = np.floor(proj_y)
+        proj_y = np.clip(proj_y, 0, self.H - 1).astype(int)
+        
+        # order in decreasing depth
+        order = np.argsort(depth)[::-1]
+        scan_xyzrdl = np.concatenate((scan_xyz, 
+                                      reflectance[..., np.newaxis],
+                                      depth[..., np.newaxis],
+                                      label[..., np.newaxis]),
+                                     axis=-1)
+        scan_xyzrdl = scan_xyzrdl[order]
+        proj_y = proj_y[order]
+        proj_x = proj_x[order]
         
         # setup the image tensor
-        reflectance_depth_label_img = np.zeros((self.H, self.W, 3))
-        reflectance_depth_label_img[proj_y, proj_x] = np.stack((reflectance, depth, label.float()), axis=-1)
+        projections_img = np.zeros((self.H, self.W, 6))
+        projections_img[:,:,-1] -= 1 # this helps to identify points in the projection with no lidar readings
+        projections_img[proj_y, proj_x] = scan_xyzrdl
         
-        # reflectance and depth image
-        reflectance_depth_img = torch.from_numpy(reflectance_depth_label_img[:,:,:2])
+        # frame image
+        frame_img = projections_img[:,:,:-1]
+        #frame_img = torch.from_numpy(frame_img)
         # label image
-        label_img = torch.from_numpy(reflectance_depth_label_img[:,:,2]).int()
+        label_img = projections_img[:,:,-1].astype(int)
+        #label_img = torch.from_numpy(label_img)
+        # mask image
+        mask_img = projections_img[:,:,-1]>=0
+        #mask_img = torch.from_numpy(mask_img)
         
-        return reflectance_depth_img, label_img
+        return frame_img, label_img, mask_img
 
 # %% ../nbs/00_datatools.ipynb 7
 class ProjectionVizTransform(nn.Module):
     "Pytorch transform to preprocess sphererical projection images for proper visualization."
     def __init__(self, color_map_bgr, learning_map_inv):
         super().__init__()
-        self.color_map_bgr = color_map_bgr
-        self.learning_map_inv = learning_map_inv
+        self.learning_map_inv_np = np.zeros((len(learning_map_inv),))
+        for k, v in learning_map_inv.items():
+            self.learning_map_inv_np[k] = v
+        
+        max_key = sorted(color_map_bgr.keys())[-1]
+        self.color_map_rgb_np = np.zeros((max_key+1, 3))
+        for k, v in color_map_bgr.items():
+            self.color_map_rgb_np[k] = np.array(v[::-1], np.float32)
     
-    def forward(self, frame, label):
+    def normalize(self, img, min_value, max_value):
+        assert img.max() <= max_value
+        assert img.min() >= min_value
+        assert max_value > min_value
         
-        r = (frame[:,:,0]*255.).int()
-        d = (255.*(frame[:,:,1] - frame[:,:,1].min())/(frame[:,:,1].max() - frame[:,:,1].min())).int()
-        normalized_frame = torch.stack((r, d), dim=-1)
+        img = img.clip(min_value, max_value)
+        return (255.*(img - min_value)/(max_value - min_value)).astype(int)
+    
+    def forward(self, frame_img, label_img, mask_img):
+        x = self.normalize(frame_img[:,:,0], -100., 100.)
+        y = self.normalize(frame_img[:,:,1], -100., 100.)
+        z = self.normalize(frame_img[:,:,2], -20., 5.)
+        r = self.normalize(frame_img[:,:,3], 0., 1.)
+        d = self.normalize(frame_img[:,:,4], 0., 100.)
+        normalized_frame_img = np.stack((x, y, z, r, d), axis=-1)
         
-        label = np.vectorize(self.learning_map_inv.get)(label)
-        colored_label = np.empty(label.shape + (3,))
-        for key, value in self.color_map_bgr.items():
-            indices = np.where(label == key)
-            colored_label[indices] = value[::-1]
-        colored_label = torch.from_numpy(colored_label).int()
+        label_img[mask_img] = self.learning_map_inv_np[label_img[mask_img]]
+        colored_label_img = np.zeros(label_img.shape + (3,))
+        colored_label_img[mask_img] = self.color_map_rgb_np[label_img[mask_img]]
         
-        return normalized_frame, colored_label
+        colored_label_img = colored_label_img.astype(int)
+        #colored_label_img = torch.from_numpy(colored_label_img)
+        
+        return normalized_frame_img, colored_label_img
