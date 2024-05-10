@@ -3,3 +3,4 @@ website:
     contents:
       - index.ipynb
       - 00_datatools.ipynb
+      - 01_models.ipynb
