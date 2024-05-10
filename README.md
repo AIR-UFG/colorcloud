@@ -5,14 +5,12 @@
 
 ## Install
 
-(under construction…)
+Clone the repo and run:
+
+``` sh
+pip install -e '.[dev]'
+```
 
 ## How to use
 
-Fill me in please! Don’t forget code examples:
-
-``` python
-1+1
-```
-
-    2
+**(UNDER CONSTRUCTION…)**
