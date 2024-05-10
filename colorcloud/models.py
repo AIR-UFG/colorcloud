@@ -3,11 +3,11 @@
 # %% auto 0
 __all__ = ['Block', 'Encoder', 'Decoder', 'RIUNet']
 
-# %% ../nbs/01_models.ipynb 4
+# %% ../nbs/01_models.ipynb 3
 import torch
 from torch.nn import Module, Sequential, Conv2d, BatchNorm2d, ReLU, ModuleList, MaxPool2d, ConvTranspose2d
 
-# %% ../nbs/01_models.ipynb 6
+# %% ../nbs/01_models.ipynb 5
 class Block(Module):
     "Convolutional block repeatedly used in the RIU-Net encoder and decoder."
     def __init__(self, in_channels, out_channels):
@@ -24,7 +24,7 @@ class Block(Module):
     def forward(self, x):
         return self.net(x)
 
-# %% ../nbs/01_models.ipynb 9
+# %% ../nbs/01_models.ipynb 8
 class Encoder(Module):
     "RIU-Net encoder architecture."
     def __init__(self, channels=(5, 64, 128, 256, 512, 1024)):
@@ -42,7 +42,7 @@ class Encoder(Module):
             x = self.pool(x)
         return enc_features
 
-# %% ../nbs/01_models.ipynb 12
+# %% ../nbs/01_models.ipynb 11
 class Decoder(Module):
     "RIU-Net decoder architecture."
     def __init__(self, channels=(1024, 512, 256, 128, 64)):
@@ -62,7 +62,7 @@ class Decoder(Module):
             x = block(x)
         return x
 
-# %% ../nbs/01_models.ipynb 15
+# %% ../nbs/01_models.ipynb 14
 class RIUNet(Module):
     "RIU-Net complete architecture."
     def __init__(self, in_channels=5, hidden_channels=(64, 128, 256, 512, 1024), n_classes=20):
