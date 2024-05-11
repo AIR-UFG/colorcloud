@@ -14,14 +14,26 @@ import numpy as np
 # %% ../nbs/00_datatools.ipynb 4
 class SemanticKITTIDataset(Dataset):
     "Load the SemanticKITTI data in a pytorch Dataset object."
-    def __init__(self, data_path):
+    def __init__(self, data_path, is_train=True):
         data_path = Path(data_path)
-        yaml_path = data_path/"semantic-kitti.yaml"
-        self.velodyne_path = data_path/"velodyne"
-        self.labels_path = data_path/"labels"
+        yaml_path = data_path/'semantic-kitti.yaml'
+        self.velodyne_path = data_path/'data_odometry_velodyne/dataset/sequences'
+        self.labels_path = data_path/'data_odometry_labels/dataset/sequences'
         
-        velodyne_fns = list(self.velodyne_path.glob('*.bin'))
+        velodyne_fns = []
+        if is_train: 
+            query = '*0[0-9]/velodyne/*.bin'
+            velodyne_fns += list(self.velodyne_path.rglob(query))
+            query = '*10/velodyne/*.bin'
+            velodyne_fns += list(self.velodyne_path.rglob(query))
+        else:
+            query = '*[12][1-9]/velodyne/*.bin'
+            velodyne_fns += list(self.velodyne_path.rglob(query))
+            query = '*20/velodyne/*.bin'
+            velodyne_fns += list(self.velodyne_path.rglob(query))
+        
         self.frame_ids = [fn.stem for fn in velodyne_fns]
+        self.frame_sequences = [fn.parts[-3] for fn in velodyne_fns]
         
         with open(yaml_path, 'r') as file:
             metadata = yaml.safe_load(file)
@@ -32,6 +44,7 @@ class SemanticKITTIDataset(Dataset):
         self.color_map_bgr = metadata.get('color_map', {})
         
         self.transform = None
+        self.is_train = is_train
 
     def set_transform(self, transform):
         self.transform = transform
@@ -41,20 +54,22 @@ class SemanticKITTIDataset(Dataset):
 
     def __getitem__(self, idx):
         frame_id = self.frame_ids[idx]
+        frame_sequence = self.frame_sequences[idx]
         
-        frame_path = self.velodyne_path/(frame_id + '.bin')
+        frame_path = self.velodyne_path/frame_sequence/'velodyne'/(frame_id + '.bin')
         with open(frame_path, 'rb') as f:
             frame = np.fromfile(f, dtype=np.float32).reshape(-1, 4)
         
-        label_path = self.labels_path/(frame_id + '.label')
-        with open(label_path, 'rb') as f:
-            label = np.fromfile(f, dtype=np.uint32)
-            label = label & 0xFFFF
-        label = np.vectorize(self.learning_map.get)(label)
-        label = label.astype(int)
+        label = None
+        if self.is_train:
+            label_path = self.labels_path/frame_sequence/'labels'/(frame_id + '.label')
+            with open(label_path, 'rb') as f:
+                label = np.fromfile(f, dtype=np.uint32)
+                label = label & 0xFFFF
+            label = np.vectorize(self.learning_map.get)(label)
+            label = label.astype(int)
 
         mask = None
-        
         if self.transform:
             frame, label, mask = self.transform(frame, label)
         
@@ -67,7 +82,7 @@ class SphericalProjectionTransform(nn.Module):
         super().__init__()
         self.fov_up_rad = (fov_up_deg/180.)*np.pi
         self.fov_down_rad = (fov_down_deg/180.)*np.pi
-        self.fov_rad = abs(self.fov_down_rad) + abs(self.fov_up_rad)
+        self.fov_rad = self.fov_up_rad - self.fov_down_rad
         self.W = W
         self.H = H
         
@@ -88,7 +103,7 @@ class SphericalProjectionTransform(nn.Module):
         
         # get projections in image coords (between [0.0, 1.0])
         proj_x = 0.5 * (yaw / np.pi + 1.0)
-        proj_y = (abs(self.fov_up_rad) - pitch)/self.fov_rad
+        proj_y = (self.fov_up_rad - pitch)/self.fov_rad
 
         assert proj_x.min() >= 0.
         assert proj_x.max() <= 1.
@@ -108,24 +123,32 @@ class SphericalProjectionTransform(nn.Module):
         
         # order in decreasing depth
         order = np.argsort(depth)[::-1]
-        scan_xyzrdl = np.concatenate((scan_xyz, 
-                                      reflectance[..., np.newaxis],
-                                      depth[..., np.newaxis],
-                                      label[..., np.newaxis]),
-                                     axis=-1)
-        scan_xyzrdl = scan_xyzrdl[order]
+        info_list = [
+            scan_xyz,
+            reflectance[..., np.newaxis],
+            depth[..., np.newaxis]
+        ]
+        if label is not None:
+            info_list += [label[..., np.newaxis]]
+            
+        scan_info = np.concatenate(info_list, axis=-1)
+        scan_info = scan_info[order]
         proj_y = proj_y[order]
         proj_x = proj_x[order]
         
         # setup the image tensor
-        projections_img = np.zeros((self.H, self.W, 6))
+        projections_img = np.zeros((self.H, self.W, 2+len(info_list)))
         projections_img[:,:,-1] -= 1 # this helps to identify points in the projection with no lidar readings
-        projections_img[proj_y, proj_x] = scan_xyzrdl
+        projections_img[proj_y, proj_x] = scan_info
         
-        # frame image
-        frame_img = projections_img[:,:,:-1]
-        # label image
-        label_img = projections_img[:,:,-1].astype(int)
+        if label is not None:
+            # frame image
+            frame_img = projections_img[:,:,:-1]
+            # label image
+            label_img = projections_img[:,:,-1].astype(int)
+        else:
+            frame_img = projections_img
+            label_img = None
         # mask image
         mask_img = projections_img[:,:,-1]>=0
         
@@ -156,17 +179,18 @@ class ProjectionVizTransform(nn.Module):
     def forward(self, frame_img, label_img, mask_img):
         x = self.normalize(frame_img[:,:,0], -100., 100.)
         y = self.normalize(frame_img[:,:,1], -100., 100.)
-        z = self.normalize(frame_img[:,:,2], -20., 5.)
+        z = self.normalize(frame_img[:,:,2], -31., 5.)
         r = self.normalize(frame_img[:,:,3], 0., 1.)
         d = self.normalize(frame_img[:,:,4], 0., 100.)
         normalized_frame_img = np.stack((x, y, z, r, d), axis=-1)
         normalized_frame_img[mask_img == False] *= 0
-        
-        label_img[mask_img] = self.learning_map_inv_np[label_img[mask_img]]
-        colored_label_img = np.zeros(label_img.shape + (3,))
-        colored_label_img[mask_img] = self.color_map_rgb_np[label_img[mask_img]]
-        
-        colored_label_img = colored_label_img.astype(int)
+
+        colored_label_img = None
+        if label_img is not None:
+            label_img[mask_img] = self.learning_map_inv_np[label_img[mask_img]]
+            colored_label_img = np.zeros(label_img.shape + (3,))
+            colored_label_img[mask_img] = self.color_map_rgb_np[label_img[mask_img]]
+            colored_label_img = colored_label_img.astype(int)
         
         return normalized_frame_img, colored_label_img, mask_img
 
