@@ -3,11 +3,11 @@
 # %% auto 0
 __all__ = ['ConvBNReLU', 'InceptionV2', 'InceptionBlock', 'Encoder', 'Decoder', 'MVLidarNet']
 
-# %% ../nbs/02_chen2020mvlidarnet.ipynb 3
+# %% ../nbs/02_chen2020mvlidarnet.ipynb 4
 import torch
 from torch import nn
 
-# %% ../nbs/02_chen2020mvlidarnet.ipynb 4
+# %% ../nbs/02_chen2020mvlidarnet.ipynb 5
 class ConvBNReLU(nn.Module):
     def __init__(self, in_channels, out_channels, kernel_size, stride, padding):
         super().__init__()
@@ -20,7 +20,7 @@ class ConvBNReLU(nn.Module):
     def forward(self, x):
         return self.net(x)
 
-# %% ../nbs/02_chen2020mvlidarnet.ipynb 6
+# %% ../nbs/02_chen2020mvlidarnet.ipynb 7
 class InceptionV2(nn.Module):
     "InceptionV2 Block"
     def __init__(self, in_channels, out_channels):
@@ -56,7 +56,7 @@ class InceptionV2(nn.Module):
         branch4 = self.b4(x)
         return torch.cat((branch1, branch2, branch3, branch4), dim=1)
 
-# %% ../nbs/02_chen2020mvlidarnet.ipynb 8
+# %% ../nbs/02_chen2020mvlidarnet.ipynb 9
 class InceptionBlock(nn.Module):
     def __init__(self, in_channels, out_channels, n_modules):
         super().__init__()
@@ -69,7 +69,7 @@ class InceptionBlock(nn.Module):
     def forward(self, x):
         return self.net(x)
 
-# %% ../nbs/02_chen2020mvlidarnet.ipynb 10
+# %% ../nbs/02_chen2020mvlidarnet.ipynb 11
 class Encoder(nn.Module):
     def __init__(self, in_channels=5):
         super().__init__()
@@ -108,19 +108,19 @@ class Encoder(nn.Module):
         
         return enc_features
 
-# %% ../nbs/02_chen2020mvlidarnet.ipynb 12
+# %% ../nbs/02_chen2020mvlidarnet.ipynb 13
 class Decoder(nn.Module):
     def __init__(self):
         super().__init__()
-        self.up1a = nn.ConvTranspose2d(128, 256, kernel_size=3, stride=2, padding=1, output_padding=1)
+        self.up1a = nn.ConvTranspose2d(128, 256, kernel_size=6, stride=2, padding=2)
         self.up1c = ConvBNReLU(256+64, 256, kernel_size=1, stride=1, padding=0)
         self.up1d = ConvBNReLU(256, 256, kernel_size=3, stride=1, padding=1)
         
-        self.up2a = nn.ConvTranspose2d(256, 128, kernel_size=3, stride=2, padding=1, output_padding=1)
+        self.up2a = nn.ConvTranspose2d(256, 128, kernel_size=6, stride=2, padding=2)
         self.up2c = ConvBNReLU(128+64, 128, kernel_size=1, stride=1, padding=0)
         self.up2d = ConvBNReLU(128, 128, kernel_size=3, stride=1, padding=1)
 
-        self.up3a = nn.ConvTranspose2d(128, 64, kernel_size=3, stride=2, padding=1, output_padding=1)
+        self.up3a = nn.ConvTranspose2d(128, 64, kernel_size=6, stride=2, padding=2)
         self.up3b = ConvBNReLU(64, 64, kernel_size=1, stride=1, padding=0)
         self.up3c = ConvBNReLU(64, 64, kernel_size=3, stride=1, padding=1)
     
@@ -143,7 +143,7 @@ class Decoder(nn.Module):
         
         return x
 
-# %% ../nbs/02_chen2020mvlidarnet.ipynb 14
+# %% ../nbs/02_chen2020mvlidarnet.ipynb 15
 class MVLidarNet(nn.Module):
     def __init__(self, n_classes=7):
         super().__init__()

@@ -48,7 +48,7 @@ class Decoder(Module):
     def __init__(self, channels=(1024, 512, 256, 128, 64)):
         super().__init__()
         self.upconvs = ModuleList(
-            [ConvTranspose2d(channels[i], channels[i+1], 2, 2) for i in range(len(channels)-1)]
+            [ConvTranspose2d(channels[i], channels[i+1], 6, 2, 2) for i in range(len(channels)-1)]
         )
         self.blocks = ModuleList(
             [Block(channels[i], channels[i+1]) for i in range(len(channels)-1)]
