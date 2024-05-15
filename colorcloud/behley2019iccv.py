@@ -40,13 +40,38 @@ class SemanticKITTIDataset(Dataset):
             metadata = yaml.safe_load(file)
         
         self.labels_dict = metadata.get('labels', {})
+        
         self.learning_map = metadata.get('learning_map', {})
+        max_key = sorted(self.learning_map.keys())[-1]
+        self.learning_map_np = np.zeros((max_key+1,), dtype=int)
+        for k, v in self.learning_map.items():
+            self.learning_map_np[k] = v
+        
         self.learning_map_inv = metadata.get('learning_map_inv', {})
+        self.learning_map_inv_np = np.zeros((len(self.learning_map_inv),))
+        for k, v in self.learning_map_inv.items():
+            self.learning_map_inv_np[k] = v
+        
         self.color_map_bgr = metadata.get('color_map', {})
+        max_key = sorted(self.color_map_bgr.keys())[-1]
+        self.color_map_rgb_np = np.zeros((max_key+1, 3))
+        for k, v in self.color_map_bgr.items():
+            self.color_map_rgb_np[k] = np.array(v[::-1], np.float32)
         
         self.transform = None
         self.is_train = is_train
-
+    
+    def learning_remap(self, remapping_rules):
+        new_map_np = np.zeros_like(self.learning_map_np, dtype=int)
+        max_key = sorted(remapping_rules.values())[-1]
+        new_map_inv_np = np.zeros((max_key+1,), dtype=int)
+        for k, v in remapping_rules.items():
+            new_map_np[self.learning_map_np == k] = v
+            if new_map_inv_np[v] == 0:
+                new_map_inv_np[v] = self.learning_map_inv_np[k]
+        self.learning_map_np = new_map_np
+        self.learning_map_inv_np = new_map_inv_np
+    
     def set_transform(self, transform):
         self.transform = transform
     
@@ -67,9 +92,8 @@ class SemanticKITTIDataset(Dataset):
             with open(label_path, 'rb') as f:
                 label = np.fromfile(f, dtype=np.uint32)
                 label = label & 0xFFFF
-            label = np.vectorize(self.learning_map.get)(label)
-            label = label.astype(int)
-
+            label = self.learning_map_np[label]
+        
         mask = None
         if self.transform:
             frame, label, mask = self.transform(frame, label)
@@ -123,26 +147,28 @@ class UnfoldingProjection:
     
     def get_xy_projections(self, scan_xyz, depth):
         # get yaw angles of all points
-        yaw = np.arctan2(-scan_xyz[:,1], -scan_xyz[:,0])
+        yaw = np.arctan2(scan_xyz[:,1], scan_xyz[:,0])
         
-        # clip yaw value between ]-pi, pi[ to avoid numerical erros
-        bound = np.pi - self.eps
-        yaw = np.clip(yaw, -bound, bound)
+        ## correct yaw value o be between ]0, 2*pi[
+        yaw[yaw < 0] += 2.*np.pi
         
         # scale to image size
-        proj_x  = np.floor(self.W*0.5*(1. - yaw/np.pi)).astype(int)
+        proj_x  = np.floor(self.W*0.5*yaw/np.pi).astype(int)
         
         assert proj_x.min() >= 0
         assert proj_x.max() < self.W
         
         # find discontinuities ("jumps") from scan completing cycle
-        jump = abs(yaw[1:] - yaw[:-1]) > 100.*np.pi/180.
+        jump = yaw[1:] - yaw[:-1] < -np.pi
         jump = np.concatenate((np.zeros(1), jump))
         
         # every jump indicates a new scan row
         proj_y = jump.cumsum().astype(int)
         
-        assert proj_y.max() == self.H - 1
+        # for debugging only
+        if proj_y.max() > self.H - 1:
+            print(proj_y.max())
+        assert proj_y.max() <= self.H - 1
         
         return proj_x, proj_y
 
@@ -205,16 +231,10 @@ class ProjectionTransform(nn.Module):
 # %% ../nbs/00_behley2019iccv.ipynb 16
 class ProjectionVizTransform(nn.Module):
     "Pytorch transform to preprocess projection images for proper visualization."
-    def __init__(self, color_map_bgr, learning_map_inv):
+    def __init__(self, color_map_rgb_np, learning_map_inv_np):
         super().__init__()
-        self.learning_map_inv_np = np.zeros((len(learning_map_inv),))
-        for k, v in learning_map_inv.items():
-            self.learning_map_inv_np[k] = v
-        
-        max_key = sorted(color_map_bgr.keys())[-1]
-        self.color_map_rgb_np = np.zeros((max_key+1, 3))
-        for k, v in color_map_bgr.items():
-            self.color_map_rgb_np[k] = np.array(v[::-1], np.float32)
+        self.color_map_rgb_np = color_map_rgb_np
+        self.learning_map_inv_np = learning_map_inv_np
     
     def normalize(self, img, min_value, max_value):
         assert img.max() <= max_value
@@ -242,7 +262,7 @@ class ProjectionVizTransform(nn.Module):
         
         return normalized_frame_img, colored_label_img, mask_img
 
-# %% ../nbs/00_behley2019iccv.ipynb 23
+# %% ../nbs/00_behley2019iccv.ipynb 24
 class ProjectionToTensorTransform(nn.Module):
     "Pytorch transform that converts the projections from np.array to torch.tensor. It also changes the frame image format from (H, W, C) to (C, H, W)."
     def forward(self, frame_img, label_img, mask_img):
