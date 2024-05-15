@@ -152,3 +152,7 @@ checklink/cookies.txt
 
 # lightning
 experiments/lightning_logs/*
+
+# wandb
+experiments/colorcloud/*
+experiments/wandb/*
