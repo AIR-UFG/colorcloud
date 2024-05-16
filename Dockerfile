@@ -11,7 +11,7 @@ RUN apt update && apt install -y \
 
 ARG git_user_name
 ARG git_user_email
-RUN git config --global user.name $git_user_name && \
+RUN git config --global user.name "$git_user_name" && \
     git config --global user.email $git_user_email 
 
 # install quarto and its jupyterlab extension: https://quarto.org/docs/get-started/hello/jupyter.html
