@@ -15,7 +15,7 @@ import numpy as np
 # %% ../nbs/00_behley2019iccv.ipynb 4
 class SemanticKITTIDataset(Dataset):
     "Load the SemanticKITTI data in a pytorch Dataset object."
-    def __init__(self, data_path, is_train=True):
+    def __init__(self, data_path, is_train=True, transform=None):
         data_path = Path(data_path)
         yaml_path = data_path/'semantic-kitti.yaml'
         self.velodyne_path = data_path/'data_odometry_velodyne/dataset/sequences'
@@ -58,7 +58,7 @@ class SemanticKITTIDataset(Dataset):
         for k, v in self.color_map_bgr.items():
             self.color_map_rgb_np[k] = np.array(v[::-1], np.float32)
         
-        self.transform = None
+        self.transform = transform
         self.is_train = is_train
     
     def learning_remap(self, remapping_rules):
