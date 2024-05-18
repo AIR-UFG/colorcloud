@@ -124,16 +124,21 @@ class LitDataModule(LightningDataModule):
     def predict_dataloader(self):
         return DataLoader(self.ds_predict, batch_size=self.eval_batch_size, num_workers=self.num_workers)
 
-# %% ../nbs/01_biasutti2019riu.ipynb 17
+# %% ../nbs/01_biasutti2019riu.ipynb 18
 class LitModel(LightningModule):
     "Lightning Module to facilitate reproducibility of experiments in the original paper."
-    def __init__(self):
+    def __init__(self, debugging=False, debugging_hook=None):
         super().__init__()
         self.bn = BatchNorm2d(5, affine=False, momentum=None)
         self.net = RIUNet()
         self.loss_fn = CrossEntropyLoss(reduction='none')
         self.train_accuracy = Accuracy(task="multiclass", num_classes=20)
         self.val_accuracy = Accuracy(task="multiclass", num_classes=20)
+        self.debugging = debugging
+        self.debugging_hook = debugging_hook
+        
+        for n, m in self.net.named_modules():
+            m.name = n
 
     def repetitive_step_routine(self, batch, batch_idx, stage, metric):
         img, label, mask = batch
@@ -146,17 +151,24 @@ class LitModel(LightningModule):
         std = loss[mask].std()
         loss = loss[mask].mean()
 
-        pred_f = torch.permute(pred, (1, 0, 2, 3))
-        pred_f = torch.flatten(pred_f, 1)
+        pred_f = torch.permute(pred, (0, 2, 3, 1))
+        pred_f = torch.flatten(pred_f, 0, -2)
         mask_f = torch.flatten(mask)
-        pred_m = pred_f[:, mask_f]
-        pred_m = torch.permute(pred_m, (1, 0))
+        pred_m = pred_f[mask_f, :]
         label_m = label[mask]
         metric(pred_m, label_m)
 
         self.log(f"{stage}_loss_std", std)
         self.log(f"{stage}_acc_step", metric)
         self.log(f"{stage}_loss", loss)
+
+        if stage=="train" and self.debugging:
+            if self.global_step % 10 == 0:
+                wandb_logger = self.logger.experiment
+                with torch.nn.modules.module.register_module_forward_hook(
+                    self.debugging_hook(wandb_logger, self.global_step)
+                ):
+                    self.net(bn_img)  # run forward pass on current batch to log activations
         
         return loss
 
@@ -170,7 +182,6 @@ class LitModel(LightningModule):
         self.repetitive_step_routine(batch, batch_idx, "val", self.val_accuracy)
 
     def on_validation_epoch_end(self):
-        # log epoch metric
         self.log('val_acc_epoch', self.val_accuracy)
 
     def configure_optimizers(self):

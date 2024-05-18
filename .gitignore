@@ -155,4 +155,5 @@ experiments/lightning_logs/*
 
 # wandb
 experiments/colorcloud/*
+experiments/fmnist/*
 experiments/wandb/*
