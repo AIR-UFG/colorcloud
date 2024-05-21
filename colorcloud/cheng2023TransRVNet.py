@@ -9,7 +9,7 @@ __all__ = ['ConvBNPReLU', 'SACBlock', 'MRCIAMSingleChannel', 'MRCIAM', 'BasicEnc
 import torch 
 import torch.nn as nn
 
-# %% ../nbs/03_cheng2023TransRVNet.ipynb 7
+# %% ../nbs/03_cheng2023TransRVNet.ipynb 8
 class ConvBNPReLU(nn.Module):
     "Sequential composition of 2D convolution, batch normalization and PReLU."
     def __init__(self, 
@@ -30,7 +30,7 @@ class ConvBNPReLU(nn.Module):
         out = self.activation(out)
         return out
 
-# %% ../nbs/03_cheng2023TransRVNet.ipynb 8
+# %% ../nbs/03_cheng2023TransRVNet.ipynb 10
 class SACBlock(nn.Module):
     """Divides the input feature map into groups, integrating channel and spatial 
     attention for each group using the Shuffle Unit, aggregating all sub-features, 
@@ -88,7 +88,7 @@ class SACBlock(nn.Module):
         out = self.channel_shuffle(out, 2)
         return out
 
-# %% ../nbs/03_cheng2023TransRVNet.ipynb 11
+# %% ../nbs/03_cheng2023TransRVNet.ipynb 14
 class MRCIAMSingleChannel(nn.Module):
     """
     Implementaton of MRCIAMSingleChannel (output is a hyper parameter).
@@ -148,7 +148,7 @@ class MRCIAMSingleChannel(nn.Module):
 
         return out
 
-# %% ../nbs/03_cheng2023TransRVNet.ipynb 15
+# %% ../nbs/03_cheng2023TransRVNet.ipynb 18
 class MRCIAM(nn.Module):
     """
     MRCIAM module is the agregation of 3 MRCIAMSingleChannel, each will compute
@@ -177,7 +177,7 @@ class MRCIAM(nn.Module):
 
       return out
 
-# %% ../nbs/03_cheng2023TransRVNet.ipynb 18
+# %% ../nbs/03_cheng2023TransRVNet.ipynb 22
 class BasicEncoderBlock(nn.Module):
     """
     Basic block of encoder module
@@ -212,7 +212,7 @@ class BasicEncoderBlock(nn.Module):
 
         return out
 
-# %% ../nbs/03_cheng2023TransRVNet.ipynb 20
+# %% ../nbs/03_cheng2023TransRVNet.ipynb 24
 class CAM(nn.Module):
     """
     Context aggregation module
@@ -236,7 +236,7 @@ class CAM(nn.Module):
         # Element-wise Multiply
         return y * x
 
-# %% ../nbs/03_cheng2023TransRVNet.ipynb 22
+# %% ../nbs/03_cheng2023TransRVNet.ipynb 27
 class EncoderModule(nn.Module):
     """
     Encoder module, is the agregation of 1 Basic encoder block followed by 1 CAM
@@ -248,12 +248,12 @@ class EncoderModule(nn.Module):
         self.encoder_block = BasicEncoderBlock(in_channels, out_channels)
         # in_channels of CAM is the out_shape of BasicEncoderBlock, see BasicEncoderBlock
         self.cam = CAM(out_channels)
-        self.avg_pool = nn.AvgPool2d(kernel_size=2)
+        self.avg_pool = nn.AvgPool2d(kernel_size=3, stride=2, padding=1)
 
     def forward(self, x):
         return self.avg_pool(self.cam(self.encoder_block(x)))
 
-# %% ../nbs/03_cheng2023TransRVNet.ipynb 28
+# %% ../nbs/03_cheng2023TransRVNet.ipynb 33
 class GELU(nn.Module):
     """
     """
@@ -696,7 +696,7 @@ class SwinTransformer(nn.Module):
 
         return x
 
-# %% ../nbs/03_cheng2023TransRVNet.ipynb 33
+# %% ../nbs/03_cheng2023TransRVNet.ipynb 38
 class Decoder(nn.Module):
     """
     """
@@ -714,7 +714,7 @@ class Decoder(nn.Module):
         # need to put a flatten here
         return out
 
-# %% ../nbs/03_cheng2023TransRVNet.ipynb 35
+# %% ../nbs/03_cheng2023TransRVNet.ipynb 41
 class ConvDecoderBlock(nn.Module):
     """
     """
@@ -734,7 +734,7 @@ class ConvDecoderBlock(nn.Module):
         # need to put a flatten here
         return out
 
-# %% ../nbs/03_cheng2023TransRVNet.ipynb 38
+# %% ../nbs/03_cheng2023TransRVNet.ipynb 44
 class TransVRNet(nn.Module):
     """
     """
