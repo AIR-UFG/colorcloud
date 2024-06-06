@@ -245,13 +245,15 @@ class ProjectionVizTransform(nn.Module):
         return (255.*(img - min_value)/(max_value - min_value)).astype(int)
     
     def forward(self, frame_img, label_img, mask_img):
-        x = self.normalize(frame_img[:,:,0], -100., 100.)
-        y = self.normalize(frame_img[:,:,1], -100., 100.)
-        z = self.normalize(frame_img[:,:,2], -31., 5.)
-        r = self.normalize(frame_img[:,:,3], 0., 1.)
-        d = self.normalize(frame_img[:,:,4], 0., 100.)
-        normalized_frame_img = np.stack((x, y, z, r, d), axis=-1)
-        normalized_frame_img[mask_img == False] *= 0
+        normalized_frame_img = None
+        if frame_img is not None:
+            x = self.normalize(frame_img[:,:,0], -100., 100.)
+            y = self.normalize(frame_img[:,:,1], -100., 100.)
+            z = self.normalize(frame_img[:,:,2], -31., 5.)
+            r = self.normalize(frame_img[:,:,3], 0., 1.)
+            d = self.normalize(frame_img[:,:,4], 0., 100.)
+            normalized_frame_img = np.stack((x, y, z, r, d), axis=-1)
+            normalized_frame_img[mask_img == False] *= 0
 
         colored_label_img = None
         if label_img is not None:
