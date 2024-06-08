@@ -6,12 +6,13 @@ __all__ = ['SemanticKITTIDataset', 'SphericalProjection', 'UnfoldingProjection',
 
 # %% ../nbs/00_behley2019iccv.ipynb 2
 import torch
-from torch.utils.data import Dataset
+from torch.utils.data import Dataset, DataLoader, random_split
 from torch import nn
 import yaml
 from pathlib import Path
 import numpy as np
 from lightning import LightningDataModule
+from torchvision.transforms import v2
 
 # %% ../nbs/00_behley2019iccv.ipynb 4
 class SemanticKITTIDataset(Dataset):
@@ -268,7 +269,7 @@ class ProjectionVizTransform(nn.Module):
         
         return normalized_frame_img, colored_label_img, mask_img
 
-# %% ../nbs/00_behley2019iccv.ipynb 36
+# %% ../nbs/00_behley2019iccv.ipynb 35
 class ProjectionToTensorTransform(nn.Module):
     "Pytorch transform that converts the projections from np.array to torch.tensor. It also changes the frame image format from (H, W, C) to (C, H, W)."
     def forward(self, frame_img, label_img, mask_img):
@@ -278,13 +279,9 @@ class ProjectionToTensorTransform(nn.Module):
         mask_img = torch.from_numpy(mask_img)
         return frame_img, label_img, mask_img
 
-# %% ../nbs/00_behley2019iccv.ipynb 45
+# %% ../nbs/00_behley2019iccv.ipynb 44
 class SemanticSegmentationLDM(LightningDataModule):
     "Lightning DataModule to facilitate reproducibility of experiments."
-    proj_class = {
-        'unfold': UnfoldingProjection,
-        'spherical': SphericalProjection
-    }
     def __init__(self, 
                  proj_style='unfold',
                  proj_kargs={'W': 512, 'H': 64},
@@ -294,8 +291,12 @@ class SemanticSegmentationLDM(LightningDataModule):
                  num_workers=8
                 ):
         super().__init__()
-        
-        assert proj_style in proj_fn.keys()
+
+        proj_class = {
+        'unfold': UnfoldingProjection,
+        'spherical': SphericalProjection
+        }
+        assert proj_style in proj_class.keys()
         self.proj = proj_class[proj_style](**proj_kargs)
         self.remapping_rules = remapping_rules
         self.train_batch_size = train_batch_size
@@ -309,9 +310,9 @@ class SemanticSegmentationLDM(LightningDataModule):
             ProjectionToTensorTransform(),
         ])
         ds = SemanticKITTIDataset(data_path, is_train=(stage == "fit"), transform=tfms)
-        if remapping_rules:
-            ds.learning_remap(remapping_rules)
-        if not hasattr(self, viz_tfm):
+        if self.remapping_rules:
+            ds.learning_remap(self.remapping_rules)
+        if not hasattr(self, 'viz_tfm'):
             self.viz_tfm = ProjectionVizTransform(ds.color_map_rgb_np, ds.learning_map_inv_np)
         
         if stage == "fit":
