@@ -188,7 +188,7 @@ class MRCIAM(nn.Module):
 
       return out
 
-# %% ../nbs/03_cheng2023TransRVNet.ipynb 26
+# %% ../nbs/03_cheng2023TransRVNet.ipynb 27
 class BasicEncoderBlock(nn.Module):
     """
     Basic block of encoder module
@@ -223,7 +223,7 @@ class BasicEncoderBlock(nn.Module):
 
         return out
 
-# %% ../nbs/03_cheng2023TransRVNet.ipynb 28
+# %% ../nbs/03_cheng2023TransRVNet.ipynb 29
 class CAM(nn.Module):
     """
     Context aggregation module
@@ -248,7 +248,7 @@ class CAM(nn.Module):
         # Element-wise Multiply
         return y * x
 
-# %% ../nbs/03_cheng2023TransRVNet.ipynb 31
+# %% ../nbs/03_cheng2023TransRVNet.ipynb 32
 class EncoderModule(nn.Module):
     """
     Encoder module, is the agregation of 1 Basic encoder block followed by 1 CAM
@@ -269,7 +269,7 @@ class EncoderModule(nn.Module):
 
         return x, out
 
-# %% ../nbs/03_cheng2023TransRVNet.ipynb 38
+# %% ../nbs/03_cheng2023TransRVNet.ipynb 39
 class GELU(nn.Module):
     """
     Activation function
@@ -280,7 +280,7 @@ class GELU(nn.Module):
     def forward(self, x):
         return 0.5*x*(1+torch.tanh(np.sqrt(2/np.pi)*(x+0.044715*torch.pow(x,3))))
 
-# %% ../nbs/03_cheng2023TransRVNet.ipynb 39
+# %% ../nbs/03_cheng2023TransRVNet.ipynb 40
 class MLP(nn.Module):
     """
     A simple Multilayer perceptron.
@@ -309,7 +309,7 @@ class MLP(nn.Module):
         x = self.drop(x)
         return x
 
-# %% ../nbs/03_cheng2023TransRVNet.ipynb 41
+# %% ../nbs/03_cheng2023TransRVNet.ipynb 42
 def window_partition(x:torch.Tensor, # (B, H, W, C)
                      window_size:int # window size
                     )->torch.Tensor: # (num_windows\*B, window_size, window_size, C)
@@ -322,7 +322,7 @@ def window_partition(x:torch.Tensor, # (B, H, W, C)
     return windows
 
 
-# %% ../nbs/03_cheng2023TransRVNet.ipynb 42
+# %% ../nbs/03_cheng2023TransRVNet.ipynb 43
 def window_reverse(windows:torch.Tensor, # (num_windows*B, window_size, window_size, C)
                    window_size:int,      # Window size
                    H:int,                # Height of image
@@ -336,7 +336,7 @@ def window_reverse(windows:torch.Tensor, # (num_windows*B, window_size, window_s
     x = x.permute(0, 1, 3, 2, 4, 5).contiguous().view(B, H, W, -1)
     return x
 
-# %% ../nbs/03_cheng2023TransRVNet.ipynb 43
+# %% ../nbs/03_cheng2023TransRVNet.ipynb 44
 class WindowAttention(nn.Module):
     """ Window based multi-head self attention (W-MSA) module with relative position bias.
         It supports both of shifted and non-shifted window.
@@ -416,11 +416,11 @@ class WindowAttention(nn.Module):
         x = self.proj_drop(x)
         return x
 
-# %% ../nbs/03_cheng2023TransRVNet.ipynb 46
+# %% ../nbs/03_cheng2023TransRVNet.ipynb 47
 # !pip install timm
 from timm.models.layers import DropPath, to_2tuple, trunc_normal_
 
-# %% ../nbs/03_cheng2023TransRVNet.ipynb 47
+# %% ../nbs/03_cheng2023TransRVNet.ipynb 48
 class SwinTransformerBlock(nn.Module):
     """ 
     Swin Transformer Block.
@@ -525,7 +525,7 @@ class SwinTransformerBlock(nn.Module):
 
         return x
 
-# %% ../nbs/03_cheng2023TransRVNet.ipynb 49
+# %% ../nbs/03_cheng2023TransRVNet.ipynb 50
 class BNTM(nn.Module):
     """
     A basic Swin Transformer layer for one stage.
@@ -612,7 +612,7 @@ class BNTM(nn.Module):
         return x, H, W
 
 
-# %% ../nbs/03_cheng2023TransRVNet.ipynb 50
+# %% ../nbs/03_cheng2023TransRVNet.ipynb 51
 class SwinTransformer(nn.Module):
     def __init__(self,
                  embed_dim=64,
@@ -723,7 +723,7 @@ class SwinTransformer(nn.Module):
 
         return x
 
-# %% ../nbs/03_cheng2023TransRVNet.ipynb 51
+# %% ../nbs/03_cheng2023TransRVNet.ipynb 52
 class ConvDecoderBlock(nn.Module):
     """
     Convolution-based decoder block for the end of decoder pipeline
@@ -748,7 +748,7 @@ class ConvDecoderBlock(nn.Module):
 
         return out
 
-# %% ../nbs/03_cheng2023TransRVNet.ipynb 54
+# %% ../nbs/03_cheng2023TransRVNet.ipynb 55
 class Decoder(nn.Module):
     def __init__(self, window_size, N_CLASSES):
         super(Decoder, self).__init__()
@@ -765,7 +765,7 @@ class Decoder(nn.Module):
         out = self.seg_head(out)
         return out
 
-# %% ../nbs/03_cheng2023TransRVNet.ipynb 57
+# %% ../nbs/03_cheng2023TransRVNet.ipynb 58
 class TransVRNet(nn.Module):
     """
     """
