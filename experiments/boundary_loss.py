@@ -7,11 +7,13 @@ import torch.nn.functional as F
 
 def one_hot(label, n_classes, requires_grad=True):
     """Return One Hot Label"""
-    divce = label.device
+    device = label.device
+    print(label[0])
+    
     one_hot_label = torch.eye(
         n_classes, device=device, requires_grad=requires_grad)[label]
     one_hot_label = one_hot_label.transpose(1, 3).transpose(2, 3)
-
+    print(one_hot_label[0][0])
     return one_hot_label
 
 
@@ -30,7 +32,7 @@ class BoundaryLoss(nn.Module):
     def forward(self, pred, gt):
         """
         Input:
-            - pred: the output from model (before softmax)
+                - pred: the output from model (before softmax)
                     shape (N, C, H, W)
             - gt: ground truth map
                     shape (N, H, w)
@@ -42,6 +44,9 @@ class BoundaryLoss(nn.Module):
 
         # softmax so that predicted map can be distributed in [0, 1]
         pred = torch.softmax(pred, dim=1)
+
+        # print("pred.shape: ", pred.shape)
+        # print("pred: ", pred)
 
         # one-hot vector of ground truth
         one_hot_gt = one_hot(gt, c)
