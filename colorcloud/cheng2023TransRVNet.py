@@ -11,6 +11,7 @@ import torch.nn as nn
 import torch.nn.functional as F
 import torch.utils.checkpoint as checkpoint
 import numpy as np
+from timm.models.layers import DropPath, to_2tuple, trunc_normal_
 
 # %% ../nbs/03_cheng2023TransRVNet.ipynb 9
 class ConvBNPReLU(nn.Module):
@@ -418,7 +419,7 @@ class WindowAttention(nn.Module):
 
 # %% ../nbs/03_cheng2023TransRVNet.ipynb 47
 # !pip install timm
-from timm.models.layers import DropPath, to_2tuple, trunc_normal_
+
 
 # %% ../nbs/03_cheng2023TransRVNet.ipynb 48
 class SwinTransformerBlock(nn.Module):
