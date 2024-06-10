@@ -175,6 +175,8 @@ def lovasz_softmax_flat(probas, labels, classes='present'):
       labels: [P] Tensor, ground truth labels (between 0 and C - 1)
       classes: 'all' for all, 'present' for classes present in labels, or a list of classes to average.
     """
+    probas = torch.softmax(probas, dim=1)
+    
     if probas.numel() == 0:
         # only void pixels, the gradients should be 0
         return probas * 0.
