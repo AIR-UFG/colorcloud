@@ -2,15 +2,17 @@
 
 # %% auto 0
 __all__ = ['SemanticKITTIDataset', 'SphericalProjection', 'UnfoldingProjection', 'ProjectionTransform', 'ProjectionVizTransform',
-           'ProjectionToTensorTransform']
+           'ProjectionToTensorTransform', 'SemanticSegmentationLDM']
 
 # %% ../nbs/00_behley2019iccv.ipynb 2
 import torch
-from torch.utils.data import Dataset
+from torch.utils.data import Dataset, DataLoader, random_split
 from torch import nn
 import yaml
 from pathlib import Path
 import numpy as np
+from lightning import LightningDataModule
+from torchvision.transforms import v2
 
 # %% ../nbs/00_behley2019iccv.ipynb 4
 class SemanticKITTIDataset(Dataset):
@@ -100,7 +102,7 @@ class SemanticKITTIDataset(Dataset):
         
         return frame, label, mask
 
-# %% ../nbs/00_behley2019iccv.ipynb 8
+# %% ../nbs/00_behley2019iccv.ipynb 12
 class SphericalProjection:
     "Calculate yaw and pitch angles for each point and quantize these angles into image grid."
     def __init__(self, fov_up_deg, fov_down_deg, W, H):
@@ -119,8 +121,10 @@ class SphericalProjection:
         proj_x = 0.5*(1. + yaw/np.pi)
         proj_y = (self.fov_up_rad - pitch)/self.fov_rad
 
+        # just making sure nothing wierd happened with the np.arctan2 function
         assert proj_x.min() >= 0.
         assert proj_x.max() <= 1.
+        # if fov_up or fov_dow are too small, these will raise an error
         assert proj_y.min() >= 0.
         assert proj_y.min() <= 1.
         
@@ -137,7 +141,7 @@ class SphericalProjection:
         
         return proj_x, proj_y
 
-# %% ../nbs/00_behley2019iccv.ipynb 10
+# %% ../nbs/00_behley2019iccv.ipynb 14
 class UnfoldingProjection:
     "Assume the points are sorted in increasing yaw order and line number."
     def __init__(self, W, H, eps=1e-5):
@@ -149,12 +153,13 @@ class UnfoldingProjection:
         # get yaw angles of all points
         yaw = np.arctan2(scan_xyz[:,1], scan_xyz[:,0])
         
-        ## correct yaw value o be between ]0, 2*pi[
+        # rectify yaw value to be between ]0, 2*pi[
         yaw[yaw < 0] += 2.*np.pi
         
         # scale to image size
         proj_x  = np.floor(self.W*0.5*yaw/np.pi).astype(int)
         
+        # just making sure nothing wierd happened with the np.arctan2 or the np.floor functions
         assert proj_x.min() >= 0
         assert proj_x.max() < self.W
         
@@ -172,7 +177,7 @@ class UnfoldingProjection:
         
         return proj_x, proj_y
 
-# %% ../nbs/00_behley2019iccv.ipynb 15
+# %% ../nbs/00_behley2019iccv.ipynb 21
 class ProjectionTransform(nn.Module):
     "Pytorch transform that turns a point cloud frame and its respective label into images in given projection style."
     def __init__(self, projection):
@@ -228,7 +233,7 @@ class ProjectionTransform(nn.Module):
         
         return frame_img, label_img, mask_img
 
-# %% ../nbs/00_behley2019iccv.ipynb 16
+# %% ../nbs/00_behley2019iccv.ipynb 28
 class ProjectionVizTransform(nn.Module):
     "Pytorch transform to preprocess projection images for proper visualization."
     def __init__(self, color_map_rgb_np, learning_map_inv_np):
@@ -236,7 +241,7 @@ class ProjectionVizTransform(nn.Module):
         self.color_map_rgb_np = color_map_rgb_np
         self.learning_map_inv_np = learning_map_inv_np
     
-    def normalize(self, img, min_value, max_value):
+    def scale(self, img, min_value, max_value):
         assert img.max() <= max_value
         assert img.min() >= min_value
         assert max_value > min_value
@@ -245,13 +250,15 @@ class ProjectionVizTransform(nn.Module):
         return (255.*(img - min_value)/(max_value - min_value)).astype(int)
     
     def forward(self, frame_img, label_img, mask_img):
-        x = self.normalize(frame_img[:,:,0], -100., 100.)
-        y = self.normalize(frame_img[:,:,1], -100., 100.)
-        z = self.normalize(frame_img[:,:,2], -31., 5.)
-        r = self.normalize(frame_img[:,:,3], 0., 1.)
-        d = self.normalize(frame_img[:,:,4], 0., 100.)
-        normalized_frame_img = np.stack((x, y, z, r, d), axis=-1)
-        normalized_frame_img[mask_img == False] *= 0
+        normalized_frame_img = None
+        if frame_img is not None:
+            x = self.scale(frame_img[:,:,0], -100., 100.)
+            y = self.scale(frame_img[:,:,1], -100., 100.)
+            z = self.scale(frame_img[:,:,2], -31., 5.)
+            r = self.scale(frame_img[:,:,3], 0., 1.)
+            d = self.scale(frame_img[:,:,4], 0., 100.)
+            normalized_frame_img = np.stack((x, y, z, r, d), axis=-1)
+            normalized_frame_img[mask_img == False] *= 0
 
         colored_label_img = None
         if label_img is not None:
@@ -262,7 +269,7 @@ class ProjectionVizTransform(nn.Module):
         
         return normalized_frame_img, colored_label_img, mask_img
 
-# %% ../nbs/00_behley2019iccv.ipynb 24
+# %% ../nbs/00_behley2019iccv.ipynb 35
 class ProjectionToTensorTransform(nn.Module):
     "Pytorch transform that converts the projections from np.array to torch.tensor. It also changes the frame image format from (H, W, C) to (C, H, W)."
     def forward(self, frame_img, label_img, mask_img):
@@ -271,3 +278,61 @@ class ProjectionToTensorTransform(nn.Module):
         label_img = torch.from_numpy(label_img)
         mask_img = torch.from_numpy(mask_img)
         return frame_img, label_img, mask_img
+
+# %% ../nbs/00_behley2019iccv.ipynb 44
+class SemanticSegmentationLDM(LightningDataModule):
+    "Lightning DataModule to facilitate reproducibility of experiments."
+    def __init__(self, 
+                 proj_style='unfold',
+                 proj_kargs={'W': 512, 'H': 64},
+                 remapping_rules=None,
+                 train_batch_size=8, 
+                 eval_batch_size=16,
+                 num_workers=8
+                ):
+        super().__init__()
+
+        proj_class = {
+        'unfold': UnfoldingProjection,
+        'spherical': SphericalProjection
+        }
+        assert proj_style in proj_class.keys()
+        self.proj = proj_class[proj_style](**proj_kargs)
+        self.remapping_rules = remapping_rules
+        self.train_batch_size = train_batch_size
+        self.eval_batch_size = eval_batch_size
+        self.num_workers = num_workers
+    
+    def setup(self, stage: str):
+        data_path = '/workspace/data'
+        tfms = v2.Compose([
+            ProjectionTransform(self.proj),
+            ProjectionToTensorTransform(),
+        ])
+        ds = SemanticKITTIDataset(data_path, is_train=(stage == "fit"), transform=tfms)
+        if self.remapping_rules:
+            ds.learning_remap(self.remapping_rules)
+        if not hasattr(self, 'viz_tfm'):
+            self.viz_tfm = ProjectionVizTransform(ds.color_map_rgb_np, ds.learning_map_inv_np)
+        
+        if stage == "fit":
+            self.ds_train, self.ds_val = random_split(
+                ds, [0.7, 0.3], generator=torch.Generator().manual_seed(42)
+            )
+        if stage == "test":
+            self.ds_test = ds
+        if stage == "predict":
+            self.ds_predict = ds
+            
+
+    def train_dataloader(self):
+        return DataLoader(self.ds_train, batch_size=self.train_batch_size, num_workers=self.num_workers)
+
+    def val_dataloader(self):
+        return DataLoader(self.ds_val, batch_size=self.eval_batch_size, num_workers=self.num_workers)
+
+    def test_dataloader(self):
+        return DataLoader(self.ds_test, batch_size=self.eval_batch_size, num_workers=self.num_workers)
+
+    def predict_dataloader(self):
+        return DataLoader(self.ds_predict, batch_size=self.eval_batch_size, num_workers=self.num_workers)

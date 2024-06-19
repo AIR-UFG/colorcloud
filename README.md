@@ -26,5 +26,5 @@ docker build --build-arg git_user_name="<your_name>" --build-arg git_user_email=
 2.  After the image is built, run a container:
 
 ``` sh
-docker run --gpus all --ipc=host --network=host --name <name_your_container>
+docker run --gpus all --ipc=host --network=host --name <name_your_container> colorcloud:latest
 ```

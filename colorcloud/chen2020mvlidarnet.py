@@ -5,26 +5,35 @@ __all__ = ['ConvBNReLU', 'InceptionV2', 'InceptionBlock', 'Encoder', 'Decoder', 
 
 # %% ../nbs/02_chen2020mvlidarnet.ipynb 4
 import torch
-from torch import nn
+from torch.nn import Module, Sequential, Conv2d, BatchNorm2d, ReLU, ConvTranspose2d, MaxPool2d
+from torch.nn.init import kaiming_normal_, constant_, zeros_
+from collections import OrderedDict
+import re
 
 # %% ../nbs/02_chen2020mvlidarnet.ipynb 5
-class ConvBNReLU(nn.Module):
+class ConvBNReLU(Sequential):
     "Sequential composition of convolution, batch normalization and ReLU."
     def __init__(self, in_channels, out_channels, kernel_size, stride, padding, has_ReLU=True):
-        super().__init__()
         sequence = [
-            nn.Conv2d(in_channels, out_channels, kernel_size, stride, padding, bias=False),
-            nn.BatchNorm2d(out_channels)
+            ('conv', Conv2d(in_channels, out_channels, kernel_size, stride, padding, bias=False)),
+            ('bn', BatchNorm2d(out_channels, momentum=0.01))
         ]
+        self.nonlinearity = 'linear'
         if has_ReLU:
-            sequence += [nn.ReLU()]
-        self.net = nn.Sequential(*sequence)
-    
-    def forward(self, x):
-        return self.net(x)
+            self.nonlinearity = 'relu'
+            sequence += [('relu', ReLU())]
+        super().__init__(OrderedDict(sequence))
+        self.init_params()
+
+    def init_params(self):
+        for n, p in self.named_parameters():
+            if re.search('conv\.weight', n):
+                kaiming_normal_(p, nonlinearity=self.nonlinearity)
+            if re.search('bn\.bias', n):
+                constant_(p, 0.1)
 
 # %% ../nbs/02_chen2020mvlidarnet.ipynb 7
-class InceptionV2(nn.Module):
+class InceptionV2(Module):
     "InceptionV2 Block from [Rethinking the Inception Architecture for Computer Vision](https://arxiv.org/pdf/1512.00567)."
     def __init__(self, in_channels, out_channels):
         super().__init__()
@@ -34,23 +43,23 @@ class InceptionV2(nn.Module):
         self.b1 = ConvBNReLU(in_channels, out_channels, kernel_size=1, stride=1, padding=0)
         
         # pool -> 1x1
-        self.b2 = nn.Sequential(
-            nn.MaxPool2d(kernel_size=3 , stride=1 , padding=1),
-            ConvBNReLU(in_channels, out_channels, kernel_size=1, stride=1, padding=0)
-        )
+        self.b2 = Sequential(OrderedDict([
+            ('pool', MaxPool2d(kernel_size=3 , stride=1 , padding=1)),
+            ('cbr', ConvBNReLU(in_channels, out_channels, kernel_size=1, stride=1, padding=0))
+        ]))
         
         # 1x1 -> 3x3
-        self.b3 = nn.Sequential(
-            ConvBNReLU(in_channels, out_channels, kernel_size=1, stride=1, padding=0),
-            ConvBNReLU(out_channels, out_channels, kernel_size=3, stride=1, padding=1)
-        )
+        self.b3 = Sequential(OrderedDict([
+            ('cbr1', ConvBNReLU(in_channels, out_channels, kernel_size=1, stride=1, padding=0)),
+            ('cbr2', ConvBNReLU(out_channels, out_channels, kernel_size=3, stride=1, padding=1))
+        ]))
         
         # 1x1 -> 3x3 -> 3x3
-        self.b4 = nn.Sequential(
-            ConvBNReLU(in_channels, out_channels, kernel_size=1, stride=1, padding=0),
-            ConvBNReLU(out_channels, out_channels, kernel_size=3, stride=1, padding=1),
-            ConvBNReLU(out_channels, out_channels, kernel_size=3, stride=1, padding=1)
-        )
+        self.b4 = Sequential(OrderedDict([
+            ('cbr1', ConvBNReLU(in_channels, out_channels, kernel_size=1, stride=1, padding=0)),
+            ('cbr2', ConvBNReLU(out_channels, out_channels, kernel_size=3, stride=1, padding=1)),
+            ('cbr3', ConvBNReLU(out_channels, out_channels, kernel_size=3, stride=1, padding=1))
+        ]))
     
     def forward(self, x):
         branch1 = self.b1(x)
@@ -60,41 +69,33 @@ class InceptionV2(nn.Module):
         return torch.cat((branch1, branch2, branch3, branch4), dim=1)
 
 # %% ../nbs/02_chen2020mvlidarnet.ipynb 9
-class InceptionBlock(nn.Module):
+class InceptionBlock(Sequential):
     "Sequential composition of InceptionV2 modules."
-    def __init__(self, in_channels, out_channels, n_modules):
-        super().__init__()
+    def __init__(self, in_channels, out_channels, n_modules, has_pool=False):
         modules_in_block = []
         for i in range(n_modules):
-            modules_in_block += [InceptionV2(in_channels, out_channels)]
+            modules_in_block += [(f'incept{i+1}', InceptionV2(in_channels, out_channels))]
             in_channels = out_channels
-        self.net = nn.Sequential(*modules_in_block)
-    
-    def forward(self, x):
-        return self.net(x)
+        if has_pool:
+            modules_in_block += [('pool', MaxPool2d(3, 2, 1))] # kernel_size = 3, because of inception v2 paper table 1
+        super().__init__(OrderedDict(modules_in_block))
 
 # %% ../nbs/02_chen2020mvlidarnet.ipynb 11
-class Encoder(nn.Module):
+class Encoder(Module):
     "MVLidarNet encoder architecture."
     def __init__(self, in_channels=5):
         super().__init__()
 
         self.trunk1 = ConvBNReLU(in_channels, 64, kernel_size=3, stride=1, padding=1)
         self.trunk2 = ConvBNReLU(64, 64, kernel_size=3, stride=1, padding=1)
-        self.trunk3 = nn.Sequential(
+        self.trunk3 = Sequential(
             ConvBNReLU(64, 128, kernel_size=3, stride=1, padding=1),
-            nn.MaxPool2d(3, 2, 1) # kernel_size = 3, because of inception v2 paper table 1
+            MaxPool2d(3, 2, 1) # kernel_size = 3, because of inception v2 paper table 1
         )
         
         self.block1 = InceptionBlock(in_channels=128, out_channels=64, n_modules=2)
-        self.block2 = nn.Sequential(
-            InceptionBlock(in_channels=64, out_channels=64, n_modules=2),
-            nn.MaxPool2d(3, 2, 1)
-        )
-        self.block3 = nn.Sequential(
-            InceptionBlock(in_channels=64, out_channels=128, n_modules=3),
-            nn.MaxPool2d(3, 2, 1)
-        )
+        self.block2 = InceptionBlock(in_channels=64, out_channels=64, n_modules=2, has_pool=True)
+        self.block3 = InceptionBlock(in_channels=64, out_channels=128, n_modules=3, has_pool=True)
     
     def forward(self, x):
         enc_features = [x]
@@ -114,21 +115,27 @@ class Encoder(nn.Module):
         return enc_features
 
 # %% ../nbs/02_chen2020mvlidarnet.ipynb 13
-class Decoder(nn.Module):
+class Decoder(Module):
     "MVLidarNet decoder architecture."
     def __init__(self):
         super().__init__()
-        self.up1a = nn.ConvTranspose2d(128, 256, kernel_size=3, stride=2, padding=1)
+        self.up1a = ConvTranspose2d(128, 256, kernel_size=3, stride=2, padding=1, bias=False)
         self.up1c = ConvBNReLU(256+64, 256, kernel_size=1, stride=1, padding=0)
         self.up1d = ConvBNReLU(256, 256, kernel_size=3, stride=1, padding=1)
         
-        self.up2a = nn.ConvTranspose2d(256, 128, kernel_size=3, stride=2, padding=1)
+        self.up2a = ConvTranspose2d(256, 128, kernel_size=3, stride=2, padding=1, bias=False)
         self.up2c = ConvBNReLU(128+64, 128, kernel_size=1, stride=1, padding=0)
         self.up2d = ConvBNReLU(128, 128, kernel_size=3, stride=1, padding=1)
 
-        self.up3a = nn.ConvTranspose2d(128, 64, kernel_size=3, stride=2, padding=1)
+        self.up3a = ConvTranspose2d(128, 64, kernel_size=3, stride=2, padding=1, bias=False)
         self.up3b = ConvBNReLU(64, 64, kernel_size=1, stride=1, padding=0)
         self.up3c = ConvBNReLU(64, 64, kernel_size=3, stride=1, padding=1)
+        self.init_params()
+
+    def init_params(self):
+        for n, p in self.named_parameters():
+            if re.search('up\da\.weight', n):
+                kaiming_normal_(p, nonlinearity='linear')
     
     def forward(self, enc_features):
         x = enc_features[-1]
@@ -150,12 +157,14 @@ class Decoder(nn.Module):
         return x
 
 # %% ../nbs/02_chen2020mvlidarnet.ipynb 15
-class MVLidarNet(nn.Module):
+class MVLidarNet(Module):
     "MVLidarNet semantic segmentation architecture."
-    def __init__(self, n_classes=7):
+    def __init__(self, in_channels=5, n_classes=7):
         super().__init__()
-        self.backbone = nn.Sequential(
-            Encoder(5),
+        self.n_classes = n_classes
+        self.input_norm = BatchNorm2d(in_channels, affine=False, momentum=None)
+        self.backbone = Sequential(
+            Encoder(in_channels),
             Decoder()
         )
         
@@ -163,6 +172,7 @@ class MVLidarNet(nn.Module):
         self.classhead2 = ConvBNReLU(64, n_classes, kernel_size=1, stride=1, padding=0, has_ReLU=False)
     
     def forward(self, x):
+        x = self.input_norm(x)
         features = self.backbone(x)
         x = self.classhead1(features)
         prediction = self.classhead2(x)
