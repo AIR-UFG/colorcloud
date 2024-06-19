@@ -279,7 +279,7 @@ class ProjectionToTensorTransform(nn.Module):
         mask_img = torch.from_numpy(mask_img)
         return frame_img, label_img, mask_img
 
-# %% ../nbs/00_behley2019iccv.ipynb 44
+# %% ../nbs/00_behley2019iccv.ipynb 48
 class SemanticSegmentationLDM(LightningDataModule):
     "Lightning DataModule to facilitate reproducibility of experiments."
     def __init__(self, 
