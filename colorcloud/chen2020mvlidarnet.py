@@ -163,10 +163,10 @@ class MVLidarNet(Module):
         super().__init__()
         self.n_classes = n_classes
         self.input_norm = BatchNorm2d(in_channels, affine=False, momentum=None)
-        self.backbone = Sequential(
-            Encoder(in_channels),
-            Decoder()
-        )
+        self.backbone = Sequential(OrderedDict([
+            ('enc', Encoder(in_channels)),
+            ('dec', Decoder())
+        ]))
         
         self.classhead1 = ConvBNReLU(64, 64, kernel_size=3, stride=1, padding=1)
         self.classhead2 = ConvBNReLU(64, n_classes, kernel_size=1, stride=1, padding=0, has_ReLU=False)
