@@ -33,6 +33,9 @@ class ObjectKITTIDataset(Dataset):
             self.instance = 'testing'
             
         self.object_frame_ids = [fn.stem for fn in object_velodyne_fns]
+        self.transform = transform
+        self.is_train = is_train
+    
 
     def set_transform(self, transform):
         self.transform = transform
@@ -48,9 +51,51 @@ class ObjectKITTIDataset(Dataset):
         with open(object_frame_path, 'rb') as f:
             object_frame = np.fromfile(f, dtype=np.float32).reshape(-1, 4)
 
-        #TODO: label part
+        labels = None
+        if self.is_train:
+            label_path = self.object_labels_path/(object_frame_id + '.txt')
+            with open(label_path, 'r') as f:
+                values = [line.strip().split() for line in f]
 
-        return object_frame
+            objects = []
+            for line in range(len(values)):
+                label = values[line][0]
+                truncation = float(values[line][1])
+                occlusion = int(values[line][2])
+                alpha = float(values[line][3])
+
+                bb_2D_x1 = float(values[line][4])
+                bb_2D_y1 = float(values[line][5])
+                bb_2D_x2 = float(values[line][6])
+                bb_2D_y2 = float(values[line][7])
+
+                bb_3D_height = float(values[line][8])
+                bb_3D_width = float(values[line][9])
+                bb_3D_length = float(values[line][10])
+                bb_3D_xyz = [float(values[line][11]), float(values[line][12]), float(values[line][13])]
+                bb_3D_ry = float(values[line][14])
+
+                dict = {
+                    'label': label,
+                    'truncation': truncation,
+                    'occlusion': occlusion,
+                    'alpha': alpha,
+                    'bb_2D_x1': bb_2D_x1,
+                    'bb_2D_y1': bb_2D_y1,
+                    'bb_2D_x2': bb_2D_x2,
+                    'ybb_2D_y2': bb_2D_y2,
+                    'bb_3D_height': bb_3D_height,
+                    'bb_3D_width': bb_3D_width,
+                    'bb_3D_length': bb_3D_length,
+                    'bb_3D_xyz': bb_3D_xyz,
+                    'bb_3D_ry': bb_3D_ry
+                }
+                objects.append(dict)
+            
+            labels = objects
+
+        #TODO: Visualization
+        return object_frame, labels
         
 
 # %% ../nbs/03_Geiger2012CVPR.ipynb 9
