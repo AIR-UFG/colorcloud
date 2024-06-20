@@ -23,7 +23,7 @@ __all__ = ['ConvBNPReLU', 'SACBlock', 'MRCIAMSingleChannel', 'MRCIAM', 'BasicEnc
            'ConvDecoderBlock', 'Decoder', 'TransVRNet', 'lovasz_grad', 'iou_binary', 'iou', 'lovasz_hinge',
            'lovasz_hinge_flat', 'flatten_binary_scores', 'StableBCELoss', 'binary_xloss', 'lovasz_softmax',
            'lovasz_softmax_flat', 'flatten_probas', 'xloss', 'isnan', 'mean', 'one_hot', 'BoundaryLoss',
-           'TransRVNet_loss']
+           'calculate_frequencies', 'calculate_class_weights', 'TransRVNet_loss']
 
 # %% ../nbs/03_cheng2023TransRVNet.ipynb 10
 class ConvBNPReLU(nn.Module):
@@ -1173,14 +1173,46 @@ class BoundaryLoss(nn.Module):
 #     print(loss)
 
 # %% ../nbs/03_cheng2023TransRVNet.ipynb 65
+def calculate_frequencies(dataset):
+    class_frequencies = {i: 0 for i in range(-1, 20)}
+    
+    for img, labels, _ in dataset:
+        # Flatten the label array to count occurrences
+        flattened_labels = labels.flatten()
+        # Count the occurrences of each class
+        unique, counts = np.unique(flattened_labels, return_counts=True)
+        # Update the frequency dictionary
+        for cls, count in zip(unique, counts):
+            class_frequencies[cls] += count
+
+    # change cases where frequency is 0 to 1
+    for key, item in class_frequencies.items():
+        if item == 0:
+            class_frequencies[key] = 1
+
+    class_frequencies = list(class_frequencies.values())
+    return class_frequencies
+
+# %% ../nbs/03_cheng2023TransRVNet.ipynb 68
+# Function to calculate class weights
+# wc = (ft/fc)^i, where fc is the frequency of class c, and ft is the median of all class frequencies.
+def calculate_class_weights(frequencies, exponent):
+    median_freq = np.median(frequencies)
+    class_weights = (median_freq / frequencies) ** exponent
+    return torch.tensor(class_weights, dtype=torch.float32)
+
+# %% ../nbs/03_cheng2023TransRVNet.ipynb 70
 class TransRVNet_loss(nn.Module):
-    def __init__(self):
+    def __init__(self, device):
         super().__init__()
         # The weight of each loss
         self.Lwce = 1.0
         self.Lls = 3.0
         self.Lbd = 1.0
-        self.class_weights = torch.Tensor([1.2042, 0.8515, 0.6952, 1.7029, 2.4083, 1.5546, 1.4392, 1.3463, 1.2693, 1.0992, 1.0561, 1.0177, 0.9832, 0.9520, 0.9235, 0.8975, 0.8736, 0.8515, 0.8309, 0.8118])
+        self.class_weights = torch.Tensor([4.6610e-01, 6.9278e-01, 2.4999e+02, 2.4999e+02, 2.4999e+02,
+        1.7731e+00, 9.8434e+00, 2.4999e+02, 2.4999e+02, 1.2124e-01, 2.5104e+00,
+        2.5584e-01, 1.0000e+00, 6.0830e-01, 2.6738e-01, 1.3546e-01, 1.5246e+00,
+        2.4108e-01, 9.4718e-01, 2.6560e+00]).to(device)
 
         self.weighted_cross_entropy_loss = torch.nn.CrossEntropyLoss(weight=self.class_weights)
         self.softmax = torch.nn.Softmax(dim=1)
