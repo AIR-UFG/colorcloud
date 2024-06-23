@@ -9,7 +9,7 @@ import torch.nn.functional as F
 from torch.nn import Module, Sequential, Conv2d, BatchNorm2d, ReLU, ModuleList, ConvTranspose2d
 from torch.nn.init import kaiming_normal_, constant_, zeros_
 from torch.nn.modules.module import register_module_forward_hook
-from torch.optim import Adam
+from torch.optim import AdamW
 from torch.optim.lr_scheduler import OneCycleLR
 from lightning import LightningModule
 from torchmetrics.classification import Accuracy
@@ -113,14 +113,20 @@ class RIUNet(Module):
 # %% ../nbs/01_biasutti2019riu.ipynb 31
 def log_activations(logger, step, model, img):
     "Function that uses a Pytorch forward hook to log properties of activations for debugging purposes."
-    def debugging_hook(module, inp, out):
+    def debugging_hook(module, inp, out):            
         if 'relu' in module.name:
             acts = out.detach()
+            
             min_count = (acts < 1e-1).sum((0, 2, 3))
             shape = acts.shape
             total_count = shape[0]*shape[2]*shape[3]
             rate = min_count/total_count
             logger.log({"max_dead_rate/" + str(module.name): rate.max()}, step=step)
+            
+            #acts_flat = acts.cpu().view(-1,)
+            #acts_hist = np.histogram(acts_flat.log1p(), 100)
+            #logger.log({"relu_hist/" + str(module.name): wandb.Histogram(np_histogram=acts_hist)}, step=step)
+            
     with register_module_forward_hook(debugging_hook):
         model(img)
 
@@ -140,7 +146,7 @@ def log_imgs(pred, label, mask, viz_tfm, logger, stage, step):
 # %% ../nbs/01_biasutti2019riu.ipynb 34
 class SemanticSegmentationTask(LightningModule):
     "Lightning Module to standardize experiments with semantic segmentation tasks."
-    def __init__(self, model, loss_fn, viz_tfm, total_steps, lr=1e-3):
+    def __init__(self, model, loss_fn, viz_tfm, total_steps, lr=5e-4):
         super().__init__()
         self.model = model
         self.loss_fn = loss_fn
@@ -158,7 +164,7 @@ class SemanticSegmentationTask(LightningModule):
             m.name = n
         
     def configure_optimizers(self):
-        optimizer = Adam(self.model.parameters(), lr=self.lr, eps=1e-5)
+        optimizer = AdamW(self.model.parameters(), lr=self.lr, eps=1e-5)
         lr_scheduler = OneCycleLR(optimizer, self.lr, self.total_steps)
         return {'optimizer': optimizer, 'lr_scheduler': lr_scheduler}
     
@@ -203,7 +209,7 @@ class SemanticSegmentationTask(LightningModule):
         metric(pred_m, label_m)
         
         self.log(f"{stage}_acc_step", metric)
-        self.log(f"{stage}_loss_step", loss)
+        self.log(f"{stage}_loss_step", loss.log10())
 
         return loss, pred, label, mask
     
@@ -220,7 +226,12 @@ class SemanticSegmentationTask(LightningModule):
         
         for n, p in self.model.named_parameters():
             optim_step = p.detach() - p_old[n]
-            self.logger.experiment.log({"ud/" + str(n): (optim_step.std()/(p_old[n].std() + 1e-5)).log10()}, step=self.step_idx)
+            
+            #log_rate = optim_step.abs().log1p() - p_old[n].abs().log1p()
+            #log_rate_hist = np.histogram(log_rate.cpu().view(-1), 100)
+            #self.logger.experiment.log({"log_update_rate_hist/" + str(n): wandb.Histogram(np_histogram=log_rate_hist)}, step=self.step_idx)
+            
+            self.logger.experiment.log({"ud/" + str(n): ((optim_step.std())/(p_old[n].std() + 1e-5)).log10()}, step=self.step_idx)
         
         lr_scheduler = self.lr_schedulers()
         lr_scheduler.step()
