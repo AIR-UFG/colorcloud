@@ -1105,7 +1105,6 @@ class BoundaryLoss(nn.Module):
         """
 
         n, c, _, _ = pred.shape
-
         # softmax so that predicted map can be distributed in [0, 1]
         pred = torch.softmax(pred, dim=1)
 
@@ -1214,7 +1213,7 @@ class TransRVNet_loss(nn.Module):
         2.5584e-01, 1.0000e+00, 6.0830e-01, 2.6738e-01, 1.3546e-01, 1.5246e+00,
         2.4108e-01, 9.4718e-01, 2.6560e+00]).to(device)
 
-        self.weighted_cross_entropy_loss = torch.nn.CrossEntropyLoss(weight=self.class_weights)
+        self.weighted_cross_entropy_loss = torch.nn.CrossEntropyLoss(reduction='none', weight=self.class_weights)
         self.softmax = torch.nn.Softmax(dim=1)
         self.lovasz_softmax_loss = lovasz_softmax
         self.boundary_loss = BoundaryLoss()
