@@ -6,10 +6,11 @@ from __future__ import print_function, division
 import torch 
 import torch.nn as nn
 import torch.nn.functional as F
+from torchvision.transforms import functional as transforms_F
 import torch.utils.checkpoint as checkpoint
 import numpy as np
 from timm.models.layers import DropPath, to_2tuple, trunc_normal_
-
+import random
 
 from torch.autograd import Variable
 try:
@@ -23,7 +24,8 @@ __all__ = ['ConvBNPReLU', 'SACBlock', 'MRCIAMSingleChannel', 'MRCIAM', 'BasicEnc
            'ConvDecoderBlock', 'Decoder', 'TransVRNet', 'lovasz_grad', 'iou_binary', 'iou', 'lovasz_hinge',
            'lovasz_hinge_flat', 'flatten_binary_scores', 'StableBCELoss', 'binary_xloss', 'lovasz_softmax',
            'lovasz_softmax_flat', 'flatten_probas', 'xloss', 'isnan', 'mean', 'one_hot', 'BoundaryLoss',
-           'calculate_frequencies', 'calculate_class_weights', 'TransRVNet_loss']
+           'calculate_frequencies', 'calculate_class_weights', 'TransRVNet_loss', 'RandomRotationTransform',
+           'RandomDroppingPointsTransform']
 
 # %% ../nbs/03_cheng2023TransRVNet.ipynb 10
 class ConvBNPReLU(nn.Module):
@@ -1202,6 +1204,9 @@ def calculate_class_weights(frequencies, exponent):
 
 # %% ../nbs/03_cheng2023TransRVNet.ipynb 70
 class TransRVNet_loss(nn.Module):
+    """
+    Calculates the total loss with the weighted combination of the three loss functions.
+    """
     def __init__(self, device):
         super().__init__()
         # The weight of each loss
@@ -1226,3 +1231,54 @@ class TransRVNet_loss(nn.Module):
 
         # Return the weighted combination of the three loss functions
         return self.Lwce*wce_loss + self.Lls*lov_loss + self.Lbd*bd_loss
+
+# %% ../nbs/03_cheng2023TransRVNet.ipynb 74
+class RandomRotationTransform(nn.Module):
+    """
+    Randomly rotates an image, label, and mask by a specified range of degrees.
+    """
+    def __init__(self, degrees=30):
+        super().__init__()
+        self.degrees = degrees
+
+    def forward(self, frame, label, mask):
+        if random.random() < 0.5:  # probability of 0.5
+            angle = random.uniform(-self.degrees, self.degrees)
+    
+            # Rotate image
+            rotated_frame_tensor = transforms_F.rotate(frame.unsqueeze(0), angle).squeeze(0)
+            # Rotate label and mask
+            rotated_label_tensor = transforms_F.rotate(label.unsqueeze(0).unsqueeze(0), angle).squeeze(0).squeeze(0)
+            rotated_mask_tensor = transforms_F.rotate(mask.unsqueeze(0).unsqueeze(0), angle).squeeze(0).squeeze(0)
+    
+            return rotated_frame_tensor, rotated_label_tensor, rotated_mask_tensor
+        else:
+            # If no rotation is applied, return original tensors
+            return frame, label, mask
+
+# %% ../nbs/03_cheng2023TransRVNet.ipynb 75
+class RandomDroppingPointsTransform(nn.Module):
+    """
+    Generates a random mask with the same shape as the label, where each element has a 50% chance of being 0 or 1, 
+    then applies this random mask to zero out the corresponding elements in the image, label, and mask arrays.
+    """
+    def __init__(self, drop_prob=0.5):
+        super().__init__()
+        self.drop_prob = drop_prob
+
+    def forward(self, frame, label, mask):
+        if torch.rand(1).item() < self.drop_prob:  # overall probability of applying the transform
+            drop_mask = torch.rand_like(label.float()).gt(0.5)  # Generate a random drop mask with 0.5 probability
+            drop_mask = drop_mask.to(label.device)  # Ensure the mask is on the same device as the tensors
+
+            dropped_frame = frame.clone()
+            dropped_frame[:, drop_mask] = 0  # Broadcasting the mask over the channels
+            dropped_label = label.clone()
+            dropped_label[drop_mask] = 0
+            dropped_mask = mask.clone()
+            dropped_mask[drop_mask] = 0
+            
+            return dropped_frame, dropped_label, dropped_mask
+        else:
+            # If no dropping is applied, return original tensors
+            return frame, label, mask
