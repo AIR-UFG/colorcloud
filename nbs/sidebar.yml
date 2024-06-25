@@ -2,5 +2,7 @@ website:
   sidebar:
     contents:
       - index.ipynb
-      - 00_datatools.ipynb
-      - 01_models.ipynb
+      - 00_behley2019iccv.ipynb
+      - 01_biasutti2019riu.ipynb
+      - 02_chen2020mvlidarnet.ipynb
+      - 03_inf_ufg_dataset.ipynb
