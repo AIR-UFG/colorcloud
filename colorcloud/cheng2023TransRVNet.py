@@ -11,6 +11,8 @@ import torch.utils.checkpoint as checkpoint
 import numpy as np
 from timm.models.layers import DropPath, to_2tuple, trunc_normal_
 import random
+from .behley2019iccv import plot_projections, SemanticKITTIDataset, ProjectionVizTransform,  ProjectionTransform, SphericalProjection
+from torchvision.transforms import v2
 
 from torch.autograd import Variable
 try:
@@ -25,7 +27,7 @@ __all__ = ['ConvBNPReLU', 'SACBlock', 'MRCIAMSingleChannel', 'MRCIAM', 'BasicEnc
            'lovasz_hinge_flat', 'flatten_binary_scores', 'StableBCELoss', 'binary_xloss', 'lovasz_softmax',
            'lovasz_softmax_flat', 'flatten_probas', 'xloss', 'isnan', 'mean', 'one_hot', 'BoundaryLoss',
            'calculate_frequencies', 'calculate_class_weights', 'TransRVNet_loss', 'RandomRotationTransform',
-           'RandomDroppingPointsTransform']
+           'RandomDroppingPointsTransform', 'RandomSingInvertingTransform']
 
 # %% ../nbs/03_cheng2023TransRVNet.ipynb 10
 class ConvBNPReLU(nn.Module):
@@ -1235,50 +1237,65 @@ class TransRVNet_loss(nn.Module):
 # %% ../nbs/03_cheng2023TransRVNet.ipynb 74
 class RandomRotationTransform(nn.Module):
     """
-    Randomly rotates an image, label, and mask by a specified range of degrees.
+    Applies a random rotation around the origin to the z
+    axis of a given point cloud frame.
     """
-    def __init__(self, degrees=30):
+
+    def __init__(self, rotation_axis='xyz'):
         super().__init__()
-        self.degrees = degrees
+        self.rotation_axis = rotation_axis
 
-    def forward(self, frame, label, mask):
-        if random.random() < 0.5:  # probability of 0.5
-            angle = random.uniform(-self.degrees, self.degrees)
-    
-            # Rotate image
-            rotated_frame_tensor = transforms_F.rotate(frame.unsqueeze(0), angle).squeeze(0)
-            # Rotate label and mask
-            rotated_label_tensor = transforms_F.rotate(label.unsqueeze(0).unsqueeze(0), angle).squeeze(0).squeeze(0)
-            rotated_mask_tensor = transforms_F.rotate(mask.unsqueeze(0).unsqueeze(0), angle).squeeze(0).squeeze(0)
-    
-            return rotated_frame_tensor, rotated_label_tensor, rotated_mask_tensor
-        else:
-            # If no rotation is applied, return original tensors
-            return frame, label, mask
+    def get_rotation_matrix(self, axis, angle):
+        return np.array([[np.cos(angle), -np.sin(angle), 0],
+                             [np.sin(angle), np.cos(angle), 0],
+                             [0, 0, 1]])
 
-# %% ../nbs/03_cheng2023TransRVNet.ipynb 75
+    def forward(self, frame, label):
+        points = frame[:, :3]
+
+        # Apply a random rotation around the z-axis
+        angle = np.random.uniform(0, 2 * np.pi)
+        rotation_matrix = self.get_rotation_matrix('z', angle)
+        points = points @ rotation_matrix.T
+
+        # Combine the rotated x, y, z coordinates with the original depth and reflectance
+        rotated_frame = np.hstack((points, frame[:, 3:]))
+
+        return rotated_frame, label
+
+# %% ../nbs/03_cheng2023TransRVNet.ipynb 76
 class RandomDroppingPointsTransform(nn.Module):
     """
-    Generates a random mask with the same shape as the label, where each element has a 50% chance of being 0 or 1, 
-    then applies this random mask to zero out the corresponding elements in the image, label, and mask arrays.
+    Randomly drops a fraction of points from a point cloud frame and its corresponding labels. 
+    The fraction of points to drop is controlled by the `drop_fraction` parameter.
     """
-    def __init__(self, drop_prob=0.5):
+    def __init__(self, drop_fraction=0.5):
         super().__init__()
-        self.drop_prob = drop_prob
+        self.drop_fraction = drop_fraction
 
-    def forward(self, frame, label, mask):
-        if torch.rand(1).item() < self.drop_prob:  # overall probability of applying the transform
-            drop_mask = torch.rand_like(label.float()).gt(0.5)  # Generate a random drop mask with 0.5 probability
-            drop_mask = drop_mask.to(label.device)  # Ensure the mask is on the same device as the tensors
+    def forward(self, frame, label):
+        # Determine the number of points to drop
+        num_points_to_drop = int(self.drop_fraction * frame.shape[0])
+        
+        # Randomly select indices to drop
+        drop_indices = np.random.choice(frame.shape[0], num_points_to_drop, replace=False)
+        
+        # Drop the points and corresponding labels
+        points_dropped = np.delete(frame, drop_indices, axis=0)
+        labels_dropped = np.delete(label, drop_indices, axis=0)
 
-            dropped_frame = frame.clone()
-            dropped_frame[:, drop_mask] = 0  # Broadcasting the mask over the channels
-            dropped_label = label.clone()
-            dropped_label[drop_mask] = 0
-            dropped_mask = mask.clone()
-            dropped_mask[drop_mask] = 0
-            
-            return dropped_frame, dropped_label, dropped_mask
-        else:
-            # If no dropping is applied, return original tensors
-            return frame, label, mask
+        return points_dropped, labels_dropped
+
+# %% ../nbs/03_cheng2023TransRVNet.ipynb 78
+class RandomSingInvertingTransform(nn.Module):
+    """
+    Sign inverting for the X and Y channels.
+    """
+    def __init__(self):
+        super().__init__()
+
+    def forward(self, frame, label):
+        frame[:, 0] = -frame[:, 0]
+        frame[:, 1] = -frame[:, 1]
+
+        return frame, label

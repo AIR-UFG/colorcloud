@@ -2,7 +2,7 @@
 
 # %% auto 0
 __all__ = ['SemanticKITTIDataset', 'SphericalProjection', 'UnfoldingProjection', 'ProjectionTransform', 'ProjectionVizTransform',
-           'ProjectionToTensorTransform', 'SemanticSegmentationLDM']
+           'plot_projections', 'ProjectionToTensorTransform', 'SemanticSegmentationLDM']
 
 # %% ../nbs/00_behley2019iccv.ipynb 2
 import torch
@@ -177,6 +177,9 @@ class UnfoldingProjection:
         
         return proj_x, proj_y
 
+# %% ../nbs/00_behley2019iccv.ipynb 16
+from matplotlib import pyplot as plt
+
 # %% ../nbs/00_behley2019iccv.ipynb 21
 class ProjectionTransform(nn.Module):
     "Pytorch transform that turns a point cloud frame and its respective label into images in given projection style."
@@ -268,6 +271,17 @@ class ProjectionVizTransform(nn.Module):
             colored_label_img = colored_label_img.astype(int)
         
         return normalized_frame_img, colored_label_img, mask_img
+
+# %% ../nbs/00_behley2019iccv.ipynb 30
+def plot_projections(img, label):
+    fig, axs = plt.subplots(6, 1, figsize=(20,10), layout='compressed')
+    for i, (ax, title) in enumerate(zip(axs, ['x', 'y', 'z', 'r', 'd', 'label'])):
+        if i < 5:
+            ax.imshow(img[:,:,i])
+        else:
+            ax.imshow(label)
+        ax.set_title(title)
+        ax.axis('off')
 
 # %% ../nbs/00_behley2019iccv.ipynb 35
 class ProjectionToTensorTransform(nn.Module):
