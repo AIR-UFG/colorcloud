@@ -302,7 +302,8 @@ class SemanticSegmentationLDM(LightningDataModule):
                  remapping_rules=None,
                  train_batch_size=8, 
                  eval_batch_size=16,
-                 num_workers=8
+                 num_workers=8,
+                 tfms = None
                 ):
         super().__init__()
 
@@ -316,14 +317,17 @@ class SemanticSegmentationLDM(LightningDataModule):
         self.train_batch_size = train_batch_size
         self.eval_batch_size = eval_batch_size
         self.num_workers = num_workers
+        self.tfms = tfms
     
     def setup(self, stage: str):
         data_path = '/workspace/data'
-        tfms = v2.Compose([
-            ProjectionTransform(self.proj),
-            ProjectionToTensorTransform(),
-        ])
-        ds = SemanticKITTIDataset(data_path, is_train=(stage == "fit"), transform=tfms)
+        if not self.tfms:
+            self.tfms = v2.Compose([
+                ProjectionTransform(self.proj),
+                ProjectionToTensorTransform(),
+            ])
+            
+        ds = SemanticKITTIDataset(data_path, is_train=(stage == "fit"), transform=self.tfms)
         if self.remapping_rules:
             ds.learning_remap(self.remapping_rules)
         if not hasattr(self, 'viz_tfm'):

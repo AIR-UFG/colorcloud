@@ -13,6 +13,12 @@ from timm.models.layers import DropPath, to_2tuple, trunc_normal_
 import random
 from .behley2019iccv import plot_projections, SemanticKITTIDataset, ProjectionVizTransform,  ProjectionTransform, SphericalProjection
 from torchvision.transforms import v2
+from lightning import LightningModule
+from torchmetrics.classification import Accuracy
+from torch.optim import AdamW
+from torch.optim.lr_scheduler import OneCycleLR
+import wandb
+from torch.nn.modules.module import register_module_forward_hook
 
 from torch.autograd import Variable
 try:
@@ -27,7 +33,8 @@ __all__ = ['ConvBNPReLU', 'SACBlock', 'MRCIAMSingleChannel', 'MRCIAM', 'BasicEnc
            'lovasz_hinge_flat', 'flatten_binary_scores', 'StableBCELoss', 'binary_xloss', 'lovasz_softmax',
            'lovasz_softmax_flat', 'flatten_probas', 'xloss', 'isnan', 'mean', 'one_hot', 'BoundaryLoss',
            'calculate_frequencies', 'calculate_class_weights', 'TransRVNet_loss', 'RandomRotationTransform',
-           'RandomDroppingPointsTransform', 'RandomSingInvertingTransform']
+           'RandomDroppingPointsTransform', 'RandomSingInvertingTransform', 'log_activations', 'log_imgs',
+           'SemanticSegmentationTask']
 
 # %% ../nbs/03_cheng2023TransRVNet.ipynb 10
 class ConvBNPReLU(nn.Module):
@@ -789,6 +796,8 @@ class TransVRNet(nn.Module):
                  N_CLASSES=20
                 ):
         super(TransVRNet, self).__init__()
+        self.n_classes = N_CLASSES
+        
         self.mrciam = MRCIAM(p1, p2)
 
         self.encoder_module1 = EncoderModule(384, 64)
@@ -812,7 +821,7 @@ class TransVRNet(nn.Module):
 
         return out
 
-# %% ../nbs/03_cheng2023TransRVNet.ipynb 62
+# %% ../nbs/03_cheng2023TransRVNet.ipynb 63
 """
 Lovasz-Softmax and Jaccard hinge loss in PyTorch
 Maxim Berman 2018 ESAT-PSI KU Leuven (MIT License)
@@ -1066,7 +1075,7 @@ def mean(l, ignore_nan=False, empty=0):
         return acc
     return acc / n
 
-# %% ../nbs/03_cheng2023TransRVNet.ipynb 63
+# %% ../nbs/03_cheng2023TransRVNet.ipynb 65
 # code get from https://github.com/yiskw713/boundary_loss_for_remote_sensing
 
 # import torch
@@ -1123,13 +1132,14 @@ class BoundaryLoss(nn.Module):
         pred_b = F.max_pool2d(
             1 - pred, kernel_size=self.theta0, stride=1, padding=(self.theta0 - 1) // 2)
         pred_b -= 1 - pred
-
+        
         # extended boundary map
         gt_b_ext = F.max_pool2d(
             gt_b, kernel_size=self.theta, stride=1, padding=(self.theta - 1) // 2)
 
         pred_b_ext = F.max_pool2d(
             pred_b, kernel_size=self.theta, stride=1, padding=(self.theta - 1) // 2)
+
 
         # reshape
         gt_b = gt_b.view(n, c, -1)
@@ -1175,7 +1185,7 @@ class BoundaryLoss(nn.Module):
 
 #     print(loss)
 
-# %% ../nbs/03_cheng2023TransRVNet.ipynb 65
+# %% ../nbs/03_cheng2023TransRVNet.ipynb 68
 def calculate_frequencies(dataset):
     class_frequencies = {i: 0 for i in range(-1, 20)}
     
@@ -1196,7 +1206,7 @@ def calculate_frequencies(dataset):
     class_frequencies = list(class_frequencies.values())
     return class_frequencies
 
-# %% ../nbs/03_cheng2023TransRVNet.ipynb 68
+# %% ../nbs/03_cheng2023TransRVNet.ipynb 71
 # Function to calculate class weights
 # wc = (ft/fc)^i, where fc is the frequency of class c, and ft is the median of all class frequencies.
 def calculate_class_weights(frequencies, exponent):
@@ -1204,7 +1214,7 @@ def calculate_class_weights(frequencies, exponent):
     class_weights = (median_freq / frequencies) ** exponent
     return torch.tensor(class_weights, dtype=torch.float32)
 
-# %% ../nbs/03_cheng2023TransRVNet.ipynb 70
+# %% ../nbs/03_cheng2023TransRVNet.ipynb 74
 class TransRVNet_loss(nn.Module):
     """
     Calculates the total loss with the weighted combination of the three loss functions.
@@ -1225,16 +1235,19 @@ class TransRVNet_loss(nn.Module):
         self.lovasz_softmax_loss = lovasz_softmax
         self.boundary_loss = BoundaryLoss()
 
-    def forward(self, output, target):
+    def forward(self, output, target, mask):
         wce_loss = self.weighted_cross_entropy_loss(output, target)
+        wce_loss = wce_loss[mask].mean()
+        
         output_softmax = self.softmax(output)
         lov_loss = self.lovasz_softmax_loss(output_softmax, target)
+        
         bd_loss = self.boundary_loss(output, target)
 
         # Return the weighted combination of the three loss functions
         return self.Lwce*wce_loss + self.Lls*lov_loss + self.Lbd*bd_loss
 
-# %% ../nbs/03_cheng2023TransRVNet.ipynb 74
+# %% ../nbs/03_cheng2023TransRVNet.ipynb 78
 class RandomRotationTransform(nn.Module):
     """
     Applies a random rotation around the origin to the z
@@ -1263,7 +1276,7 @@ class RandomRotationTransform(nn.Module):
 
         return rotated_frame, label
 
-# %% ../nbs/03_cheng2023TransRVNet.ipynb 76
+# %% ../nbs/03_cheng2023TransRVNet.ipynb 80
 class RandomDroppingPointsTransform(nn.Module):
     """
     Randomly drops a fraction of points from a point cloud frame and its corresponding labels. 
@@ -1286,7 +1299,7 @@ class RandomDroppingPointsTransform(nn.Module):
 
         return points_dropped, labels_dropped
 
-# %% ../nbs/03_cheng2023TransRVNet.ipynb 78
+# %% ../nbs/03_cheng2023TransRVNet.ipynb 82
 class RandomSingInvertingTransform(nn.Module):
     """
     Sign inverting for the X and Y channels.
@@ -1299,3 +1312,140 @@ class RandomSingInvertingTransform(nn.Module):
         frame[:, 1] = -frame[:, 1]
 
         return frame, label
+
+# %% ../nbs/03_cheng2023TransRVNet.ipynb 85
+def log_activations(logger, step, model, img):
+    "Function that uses a Pytorch forward hook to log properties of activations for debugging purposes."
+    def debugging_hook(module, inp, out):            
+        # if 'relu' in module.name:
+        if False:
+            acts = out.detach()
+            
+            min_count = (acts < 1e-1).sum((0, 2, 3))
+            shape = acts.shape
+            total_count = shape[0]*shape[2]*shape[3]
+            rate = min_count/total_count
+            logger.log({"max_dead_rate/" + str(module.name): rate.max()}, step=step)
+            
+            #acts_flat = acts.cpu().view(-1,)
+            #acts_hist = np.histogram(acts_flat.log1p(), 100)
+            #logger.log({"relu_hist/" + str(module.name): wandb.Histogram(np_histogram=acts_hist)}, step=step)
+            
+    with register_module_forward_hook(debugging_hook):
+        xyz = img[:, :3, :, :]
+        reflectance = img[:, 3, :, :].unsqueeze(1)
+        depth = img[:, 4, :, :].unsqueeze(1)     
+        model(reflectance, depth, xyz)
+
+# %% ../nbs/03_cheng2023TransRVNet.ipynb 86
+def log_imgs(pred, label, mask, viz_tfm, logger, stage, step):
+    "TODO: documentation missing"
+    pred_np = pred[0].detach().cpu().numpy().argmax(0)
+    label_np = label[0].detach().cpu().numpy()
+    mask_np = mask[0].detach().cpu().numpy()
+    pred_np[pred_np == label_np] = 0
+    _, pred_img, _ = viz_tfm(None, pred_np, mask_np)
+    _, label_img, _ = viz_tfm(None, label_np, mask_np)
+    img_cmp = np.concatenate((pred_img, label_img), axis=0)
+    img_cmp = wandb.Image(img_cmp)
+    logger.log({f"{stage}_examples": img_cmp}, step=step)
+
+# %% ../nbs/03_cheng2023TransRVNet.ipynb 87
+class SemanticSegmentationTask(LightningModule):
+    "Lightning Module to standardize experiments with semantic segmentation tasks."
+    def __init__(self, model, loss_fn, viz_tfm, total_steps, lr=1e-1):
+        super().__init__()
+        self.model = model
+        self.loss_fn = loss_fn
+        self.viz_tfm = viz_tfm
+        self.lr = lr
+        self.total_steps = total_steps
+        self.dropout = torch.nn.Dropout(p=0.2, inplace=False)
+        self.train_accuracy = Accuracy(task="multiclass", num_classes=model.n_classes)
+        self.val_accuracy = Accuracy(task="multiclass", num_classes=model.n_classes)
+        self.automatic_optimization = False
+
+        self.step_idx = 0
+        
+        for n, m in self.model.named_modules():
+            assert not hasattr(m, 'name')
+            m.name = n
+        
+    def configure_optimizers(self):
+        optimizer = AdamW(self.model.parameters(), lr=self.lr, weight_decay=0.0001)
+        lr_scheduler = OneCycleLR(optimizer, max_lr=0.002, div_factor=1, final_div_factor=10, steps_per_epoch=self.total_steps, epochs=30)
+        return {'optimizer': optimizer, 'lr_scheduler': lr_scheduler}
+    
+    def training_step(self, batch, batch_idx):
+        stage = 'train'
+        logger = self.logger.experiment
+        
+        loss, pred, label, mask = self.step(batch, batch_idx, stage, self.train_accuracy)
+        if self.step_idx % int(0.01*self.total_steps) == 0:
+            log_activations(logger, self.step_idx, self.model, batch[0])
+        if self.step_idx % int(0.25*self.total_steps) == 0:
+            log_imgs(pred, label, mask, self.viz_tfm, logger, stage, self.step_idx)
+        self.manual_optimization(loss)
+        self.step_idx += 1
+    
+    def on_train_epoch_end(self):
+        self.log('train_acc_epoch', self.train_accuracy)
+
+    def validation_step(self, batch, batch_idx):
+        stage = 'val'
+        logger = self.logger.experiment
+        
+        _, pred, label, mask = self.step(batch, batch_idx, stage, self.val_accuracy)
+        if batch_idx == 0:
+            log_imgs(pred, label, mask, self.viz_tfm, logger, stage, self.step_idx)
+    
+    def step(self, batch, batch_idx, stage, metric):
+        img, label, mask = batch
+
+        # Separate channels
+        xyz = img[:, :3, :, :]
+        reflectance = img[:, 3, :, :].unsqueeze(1)
+        depth = img[:, 4, :, :].unsqueeze(1)        
+        
+        pred = self.model(reflectance, depth, xyz)
+        
+        # Apply dropout
+        pred = self.dropout(pred)
+        
+        label[~mask] = 0
+        loss = self.loss_fn(pred, label, mask)
+
+        pred_f = torch.permute(pred, (0, 2, 3, 1)) # N,C,H,W -> N,H,W,C
+        pred_f = torch.flatten(pred_f, 0, -2)      # N,H,W,C -> N*H*W,C
+        mask_f = torch.flatten(mask)               # N,H,W   -> N*H*W
+        pred_m = pred_f[mask_f, :]
+        label_m = label[mask]
+        metric(pred_m, label_m)
+        
+        self.log(f"{stage}_acc_step", metric)
+        self.log(f"{stage}_loss_step", loss.log10())
+
+        return loss, pred, label, mask
+    
+    def manual_optimization(self, loss):
+        optimizer = self.optimizers()
+        optimizer.zero_grad()
+        self.manual_backward(loss)
+        
+        p_old = {}
+        for n, p in self.model.named_parameters():
+            p_old[n] = p.detach().clone()
+        
+        optimizer.step()
+        
+        for n, p in self.model.named_parameters():
+            optim_step = p.detach() - p_old[n]
+            
+            #log_rate = optim_step.abs().log1p() - p_old[n].abs().log1p()
+            #log_rate_hist = np.histogram(log_rate.cpu().view(-1), 100)
+            #self.logger.experiment.log({"log_update_rate_hist/" + str(n): wandb.Histogram(np_histogram=log_rate_hist)}, step=self.step_idx)
+            
+            self.logger.experiment.log({"ud/" + str(n): ((optim_step.std())/(p_old[n].std() + 1e-5)).log10()}, step=self.step_idx)
+        
+        lr_scheduler = self.lr_schedulers()
+        lr_scheduler.step()
