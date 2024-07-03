@@ -44,7 +44,16 @@ class InfUFGDataset(Dataset):
         with open(frame_path, 'rb') as f:
             frame = np.fromfile(f, dtype=np.float32).reshape(-1, 4)
 
+        # Removing NAN 
+        frame = frame[~np.isnan(frame).any(axis=1)]
+
+        # Normalizing the reflectance values (which are between 0 and 255).
+        frame[:,3] = frame[:,3]/255
+        
         label = None
+        if self.is_train:
+            # The code to load the labels in the future will be here.
+            pass
         
         mask = None
         if self.transform:
