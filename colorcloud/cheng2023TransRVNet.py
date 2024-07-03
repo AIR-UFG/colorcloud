@@ -1038,9 +1038,9 @@ def flatten_probas(probas, labels, ignore=None):
     labels = labels.view(-1)
     if ignore is None:
         return probas, labels
-    valid = (labels != ignore)
-    vprobas = probas[valid.nonzero().squeeze()]
-    vlabels = labels[valid]
+    ignore = ignore.view(-1)
+    vprobas = probas[ignore.squeeze()]
+    vlabels = labels[ignore]
     return vprobas, vlabels
 
 def xloss(logits, labels, ignore=None):
@@ -1075,7 +1075,7 @@ def mean(l, ignore_nan=False, empty=0):
         return acc
     return acc / n
 
-# %% ../nbs/03_cheng2023TransRVNet.ipynb 65
+# %% ../nbs/03_cheng2023TransRVNet.ipynb 67
 # code get from https://github.com/yiskw713/boundary_loss_for_remote_sensing
 
 # import torch
@@ -1144,12 +1144,14 @@ class BoundaryLoss(nn.Module):
         # reshape
         gt_b = gt_b.view(n, c, -1)
         pred_b = pred_b.view(n, c, -1)
-        gt_b_ext = gt_b_ext.view(n, c, -1)
-        pred_b_ext = pred_b_ext.view(n, c, -1)
+        # gt_b_ext = gt_b_ext.view(n, c, -1)
+        # pred_b_ext = pred_b_ext.view(n, c, -1)
+
+        # se precisr passar a mascara, é so aplicar no pred_b
 
         # Precision, Recall
-        P = torch.sum(pred_b * gt_b_ext, dim=2) / (torch.sum(pred_b, dim=2) + 1e-7)
-        R = torch.sum(pred_b_ext * gt_b, dim=2) / (torch.sum(gt_b, dim=2) + 1e-7)
+        P = torch.sum(pred_b * gt_b, dim=2) / (torch.sum(pred_b, dim=2) + 1e-7)
+        R = torch.sum(pred_b * gt_b, dim=2) / (torch.sum(gt_b, dim=2) + 1e-7)
 
         # Boundary F1 Score
         BF1 = 2 * P * R / (P + R + 1e-7)
@@ -1185,7 +1187,7 @@ class BoundaryLoss(nn.Module):
 
 #     print(loss)
 
-# %% ../nbs/03_cheng2023TransRVNet.ipynb 68
+# %% ../nbs/03_cheng2023TransRVNet.ipynb 70
 def calculate_frequencies(dataset):
     class_frequencies = {i: 0 for i in range(-1, 20)}
     
@@ -1206,7 +1208,7 @@ def calculate_frequencies(dataset):
     class_frequencies = list(class_frequencies.values())
     return class_frequencies
 
-# %% ../nbs/03_cheng2023TransRVNet.ipynb 71
+# %% ../nbs/03_cheng2023TransRVNet.ipynb 73
 # Function to calculate class weights
 # wc = (ft/fc)^i, where fc is the frequency of class c, and ft is the median of all class frequencies.
 def calculate_class_weights(frequencies, exponent):
@@ -1214,7 +1216,7 @@ def calculate_class_weights(frequencies, exponent):
     class_weights = (median_freq / frequencies) ** exponent
     return torch.tensor(class_weights, dtype=torch.float32)
 
-# %% ../nbs/03_cheng2023TransRVNet.ipynb 74
+# %% ../nbs/03_cheng2023TransRVNet.ipynb 76
 class TransRVNet_loss(nn.Module):
     """
     Calculates the total loss with the weighted combination of the three loss functions.
@@ -1247,7 +1249,7 @@ class TransRVNet_loss(nn.Module):
         # Return the weighted combination of the three loss functions
         return self.Lwce*wce_loss + self.Lls*lov_loss + self.Lbd*bd_loss
 
-# %% ../nbs/03_cheng2023TransRVNet.ipynb 78
+# %% ../nbs/03_cheng2023TransRVNet.ipynb 80
 class RandomRotationTransform(nn.Module):
     """
     Applies a random rotation around the origin to the z
@@ -1276,7 +1278,7 @@ class RandomRotationTransform(nn.Module):
 
         return rotated_frame, label
 
-# %% ../nbs/03_cheng2023TransRVNet.ipynb 80
+# %% ../nbs/03_cheng2023TransRVNet.ipynb 82
 class RandomDroppingPointsTransform(nn.Module):
     """
     Randomly drops a fraction of points from a point cloud frame and its corresponding labels. 
@@ -1299,7 +1301,7 @@ class RandomDroppingPointsTransform(nn.Module):
 
         return points_dropped, labels_dropped
 
-# %% ../nbs/03_cheng2023TransRVNet.ipynb 82
+# %% ../nbs/03_cheng2023TransRVNet.ipynb 84
 class RandomSingInvertingTransform(nn.Module):
     """
     Sign inverting for the X and Y channels.
@@ -1313,7 +1315,7 @@ class RandomSingInvertingTransform(nn.Module):
 
         return frame, label
 
-# %% ../nbs/03_cheng2023TransRVNet.ipynb 85
+# %% ../nbs/03_cheng2023TransRVNet.ipynb 87
 def log_activations(logger, step, model, img):
     "Function that uses a Pytorch forward hook to log properties of activations for debugging purposes."
     def debugging_hook(module, inp, out):            
@@ -1337,7 +1339,7 @@ def log_activations(logger, step, model, img):
         depth = img[:, 4, :, :].unsqueeze(1)     
         model(reflectance, depth, xyz)
 
-# %% ../nbs/03_cheng2023TransRVNet.ipynb 86
+# %% ../nbs/03_cheng2023TransRVNet.ipynb 88
 def log_imgs(pred, label, mask, viz_tfm, logger, stage, step):
     "TODO: documentation missing"
     pred_np = pred[0].detach().cpu().numpy().argmax(0)
@@ -1350,7 +1352,7 @@ def log_imgs(pred, label, mask, viz_tfm, logger, stage, step):
     img_cmp = wandb.Image(img_cmp)
     logger.log({f"{stage}_examples": img_cmp}, step=step)
 
-# %% ../nbs/03_cheng2023TransRVNet.ipynb 87
+# %% ../nbs/03_cheng2023TransRVNet.ipynb 89
 class SemanticSegmentationTask(LightningModule):
     "Lightning Module to standardize experiments with semantic segmentation tasks."
     def __init__(self, model, loss_fn, viz_tfm, total_steps, lr=1e-1):
