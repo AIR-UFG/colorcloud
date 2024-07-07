@@ -18,7 +18,7 @@ import re
 import wandb
 import numpy as np
 
-# %% ../nbs/01_biasutti2019riu.ipynb 5
+# %% ../nbs/01_biasutti2019riu.ipynb 6
 class Block(Sequential):
     "Convolutional block repeatedly used in the RIU-Net encoder and decoder."
     def __init__(self, in_channels, out_channels):
@@ -39,7 +39,7 @@ class Block(Sequential):
             if re.search('bn\d\.bias', n):
                 constant_(p, 0.1)
 
-# %% ../nbs/01_biasutti2019riu.ipynb 15
+# %% ../nbs/01_biasutti2019riu.ipynb 16
 class Encoder(Module):
     "RIU-Net encoder architecture."
     def __init__(self, channels=(5, 64, 128, 256, 512, 1024)):
@@ -56,7 +56,7 @@ class Encoder(Module):
             x = F.max_pool2d(x, 2)
         return enc_features
 
-# %% ../nbs/01_biasutti2019riu.ipynb 18
+# %% ../nbs/01_biasutti2019riu.ipynb 19
 class Decoder(Module):
     "RIU-Net decoder architecture."
     def __init__(self, channels=(1024, 512, 256, 128, 64)):
@@ -82,7 +82,7 @@ class Decoder(Module):
             x = block(x)
         return x
 
-# %% ../nbs/01_biasutti2019riu.ipynb 24
+# %% ../nbs/01_biasutti2019riu.ipynb 25
 class RIUNet(Module):
     "RIU-Net complete architecture."
     def __init__(self, in_channels=5, hidden_channels=(64, 128, 256, 512, 1024), n_classes=20):
@@ -110,7 +110,7 @@ class RIUNet(Module):
         
         return prediction
 
-# %% ../nbs/01_biasutti2019riu.ipynb 31
+# %% ../nbs/01_biasutti2019riu.ipynb 32
 def log_activations(logger, step, model, img):
     "Function that uses a Pytorch forward hook to log properties of activations for debugging purposes."
     def debugging_hook(module, inp, out):            
@@ -130,7 +130,7 @@ def log_activations(logger, step, model, img):
     with register_module_forward_hook(debugging_hook):
         model(img)
 
-# %% ../nbs/01_biasutti2019riu.ipynb 32
+# %% ../nbs/01_biasutti2019riu.ipynb 33
 def log_imgs(pred, label, mask, viz_tfm, logger, stage, step):
     "TODO: documentation missing"
     pred_np = pred[0].detach().cpu().numpy().argmax(0)
@@ -143,7 +143,7 @@ def log_imgs(pred, label, mask, viz_tfm, logger, stage, step):
     img_cmp = wandb.Image(img_cmp)
     logger.log({f"{stage}_examples": img_cmp}, step=step)
 
-# %% ../nbs/01_biasutti2019riu.ipynb 34
+# %% ../nbs/01_biasutti2019riu.ipynb 35
 class SemanticSegmentationTask(LightningModule):
     "Lightning Module to standardize experiments with semantic segmentation tasks."
     def __init__(self, model, loss_fn, viz_tfm, total_steps, lr=5e-4):

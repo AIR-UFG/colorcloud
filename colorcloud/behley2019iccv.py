@@ -17,51 +17,44 @@ from torchvision.transforms import v2
 # %% ../nbs/00_behley2019iccv.ipynb 4
 class SemanticKITTIDataset(Dataset):
     "Load the SemanticKITTI data in a pytorch Dataset object."
-    def __init__(self, data_path, is_train=True, transform=None):
+    def __init__(self, data_path, split='train', transform=None):
         data_path = Path(data_path)
         yaml_path = data_path/'semantic-kitti.yaml'
         self.velodyne_path = data_path/'data_odometry_velodyne/dataset/sequences'
         self.labels_path = data_path/'data_odometry_labels/dataset/sequences'
+
+        with open(yaml_path, 'r') as file:
+            metadata = yaml.safe_load(file)
         
+        sequences = metadata['split'][split]
         velodyne_fns = []
-        if is_train: 
-            query = '*0[0-9]/velodyne/*.bin'
-            velodyne_fns += list(self.velodyne_path.rglob(query))
-            query = '*10/velodyne/*.bin'
-            velodyne_fns += list(self.velodyne_path.rglob(query))
-        else:
-            query = '*[12][1-9]/velodyne/*.bin'
-            velodyne_fns += list(self.velodyne_path.rglob(query))
-            query = '*20/velodyne/*.bin'
-            velodyne_fns += list(self.velodyne_path.rglob(query))
+        for seq in sequences:
+            velodyne_fns += list(self.velodyne_path.rglob(f'*{seq:02}/velodyne/*.bin'))
         
         self.frame_ids = [fn.stem for fn in velodyne_fns]
         self.frame_sequences = [fn.parts[-3] for fn in velodyne_fns]
         
-        with open(yaml_path, 'r') as file:
-            metadata = yaml.safe_load(file)
+        self.labels_dict = metadata['labels']
         
-        self.labels_dict = metadata.get('labels', {})
-        
-        self.learning_map = metadata.get('learning_map', {})
+        self.learning_map = metadata['learning_map']
         max_key = sorted(self.learning_map.keys())[-1]
         self.learning_map_np = np.zeros((max_key+1,), dtype=int)
         for k, v in self.learning_map.items():
             self.learning_map_np[k] = v
         
-        self.learning_map_inv = metadata.get('learning_map_inv', {})
+        self.learning_map_inv = metadata['learning_map_inv']
         self.learning_map_inv_np = np.zeros((len(self.learning_map_inv),))
         for k, v in self.learning_map_inv.items():
             self.learning_map_inv_np[k] = v
         
-        self.color_map_bgr = metadata.get('color_map', {})
+        self.color_map_bgr = metadata['color_map']
         max_key = sorted(self.color_map_bgr.keys())[-1]
         self.color_map_rgb_np = np.zeros((max_key+1, 3))
         for k, v in self.color_map_bgr.items():
             self.color_map_rgb_np[k] = np.array(v[::-1], np.float32)
         
         self.transform = transform
-        self.is_train = is_train
+        self.is_test = (split == 'test')
     
     def learning_remap(self, remapping_rules):
         new_map_np = np.zeros_like(self.learning_map_np, dtype=int)
@@ -89,16 +82,17 @@ class SemanticKITTIDataset(Dataset):
             frame = np.fromfile(f, dtype=np.float32).reshape(-1, 4)
         
         label = None
-        if self.is_train:
+        mask = None
+        if not self.is_test:
             label_path = self.labels_path/frame_sequence/'labels'/(frame_id + '.label')
             with open(label_path, 'rb') as f:
                 label = np.fromfile(f, dtype=np.uint32)
                 label = label & 0xFFFF
             label = self.learning_map_np[label]
+            mask = label != 0   # see the field *learning_ignore* in the yaml file
         
-        mask = None
         if self.transform:
-            frame, label, mask = self.transform(frame, label)
+            frame, label, mask = self.transform(frame, label, mask)
         
         return frame, label, mask
 
@@ -124,9 +118,8 @@ class SphericalProjection:
         # just making sure nothing wierd happened with the np.arctan2 function
         assert proj_x.min() >= 0.
         assert proj_x.max() <= 1.
-        # if fov_up or fov_dow are too small, these will raise an error
-        assert proj_y.min() >= 0.
-        assert proj_y.min() <= 1.
+        # filter points outside the fov as outliers
+        outliers = (proj_y < 0.)|(proj_y >= 1.)
         
         # scale to image size using angular resolution (between [0.0, W/H])
         proj_x *= self.W
@@ -139,15 +132,14 @@ class SphericalProjection:
         proj_y = np.floor(proj_y)
         proj_y = np.clip(proj_y, 0, self.H - 1).astype(int)
         
-        return proj_x, proj_y
+        return proj_x, proj_y, outliers
 
 # %% ../nbs/00_behley2019iccv.ipynb 14
 class UnfoldingProjection:
     "Assume the points are sorted in increasing yaw order and line number."
-    def __init__(self, W, H, eps=1e-5):
+    def __init__(self, W, H):
         self.W = W
         self.H = H
-        self.eps = eps
     
     def get_xy_projections(self, scan_xyz, depth):
         # get yaw angles of all points
@@ -175,7 +167,7 @@ class UnfoldingProjection:
             print(proj_y.max())
         assert proj_y.max() <= self.H - 1
         
-        return proj_x, proj_y
+        return proj_x, proj_y, None
 
 # %% ../nbs/00_behley2019iccv.ipynb 16
 from matplotlib import pyplot as plt
@@ -189,7 +181,7 @@ class ProjectionTransform(nn.Module):
         self.W = projection.W
         self.H = projection.H
         
-    def forward(self, frame, label):
+    def forward(self, frame, label, mask):
         # get point_cloud components
         scan_xyz = frame[:,:3]
         reflectance = frame[:, 3]
@@ -200,8 +192,19 @@ class ProjectionTransform(nn.Module):
         # get depths of all points
         depth = np.linalg.norm(scan_xyz, 2, axis=1)
 
-        # get projections
-        proj_x, proj_y = self.projection.get_xy_projections(scan_xyz, depth)
+        # get projections and outliers
+        proj_x, proj_y, outliers = self.projection.get_xy_projections(scan_xyz, depth)
+
+        # filter outliers
+        if outliers is not None:
+            proj_x = proj_x[~outliers]
+            proj_y = proj_y[~outliers]
+            scan_xyz = scan_xyz[~outliers]
+            reflectance = reflectance[~outliers]
+            depth = depth[~outliers]
+            if label is not None:
+                label = label[~outliers]
+                mask = mask[~outliers]
         
         # order in decreasing depth
         order = np.argsort(depth)[::-1]
@@ -211,6 +214,7 @@ class ProjectionTransform(nn.Module):
             depth[..., np.newaxis]
         ]
         if label is not None:
+            info_list += [mask[..., np.newaxis]]
             info_list += [label[..., np.newaxis]]
             
         scan_info = np.concatenate(info_list, axis=-1)
@@ -220,19 +224,18 @@ class ProjectionTransform(nn.Module):
         
         # setup the image tensor
         projections_img = np.zeros((self.H, self.W, 2+len(info_list)))
-        projections_img[:,:,-1] -= 1 # this helps to identify points in the projection with no lidar readings
+        projections_img[:,:,-1] -= 1 # this helps to identify points in the projection with no LiDAR readings
         projections_img[proj_y, proj_x] = scan_info
         
         if label is not None:
-            # frame image
-            frame_img = projections_img[:,:,:-1]
-            # label image
+            frame_img = projections_img[:,:,:-2]
             label_img = projections_img[:,:,-1].astype(int)
+            mask_img = projections_img[:,:,-2].astype(bool)
+            mask_img = mask_img & (label_img > -1)
         else:
             frame_img = projections_img
             label_img = None
-        # mask image
-        mask_img = projections_img[:,:,-1]>=0
+            mask_img = projections_img[:,:,-1] >= 0
         
         return frame_img, label_img, mask_img
 
@@ -293,7 +296,7 @@ class ProjectionToTensorTransform(nn.Module):
         mask_img = torch.from_numpy(mask_img)
         return frame_img, label_img, mask_img
 
-# %% ../nbs/00_behley2019iccv.ipynb 48
+# %% ../nbs/00_behley2019iccv.ipynb 52
 class SemanticSegmentationLDM(LightningDataModule):
     "Lightning DataModule to facilitate reproducibility of experiments."
     def __init__(self, 
@@ -326,17 +329,21 @@ class SemanticSegmentationLDM(LightningDataModule):
                 ProjectionTransform(self.proj),
                 ProjectionToTensorTransform(),
             ])
-            
-        ds = SemanticKITTIDataset(data_path, is_train=(stage == "fit"), transform=self.tfms)
+        split = stage
+        if stage == 'fit':
+            split = 'train'
+        ds = SemanticKITTIDataset(data_path, split, transform=self.tfms)
         if self.remapping_rules:
             ds.learning_remap(self.remapping_rules)
         if not hasattr(self, 'viz_tfm'):
             self.viz_tfm = ProjectionVizTransform(ds.color_map_rgb_np, ds.learning_map_inv_np)
         
         if stage == "fit":
-            self.ds_train, self.ds_val = random_split(
-                ds, [0.7, 0.3], generator=torch.Generator().manual_seed(42)
-            )
+            self.ds_train = ds
+            self.ds_val = SemanticKITTIDataset(data_path, 'valid', tfms)
+            if self.remapping_rules:
+                self.ds_val.learning_remap(self.remapping_rules)
+        
         if stage == "test":
             self.ds_test = ds
         if stage == "predict":
@@ -344,7 +351,7 @@ class SemanticSegmentationLDM(LightningDataModule):
             
 
     def train_dataloader(self):
-        return DataLoader(self.ds_train, batch_size=self.train_batch_size, num_workers=self.num_workers)
+        return DataLoader(self.ds_train, batch_size=self.train_batch_size, num_workers=self.num_workers, shuffle=True, drop_last=True)
 
     def val_dataloader(self):
         return DataLoader(self.ds_val, batch_size=self.eval_batch_size, num_workers=self.num_workers)
