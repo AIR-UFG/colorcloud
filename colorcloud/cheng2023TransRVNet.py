@@ -1081,6 +1081,10 @@ def mean(l, ignore_nan=False, empty=0):
 # import torch
 # import torch.nn as nn
 # import torch.nn.functional as F
+import matplotlib.pyplot as plt
+
+
+
 
 
 def one_hot(label, n_classes, requires_grad=True):
@@ -1106,7 +1110,7 @@ class BoundaryLoss(nn.Module):
         self.theta0 = theta0
         self.theta = theta
 
-    def forward(self, pred, gt):
+    def forward(self, pred, gt, mask):
         """
         Input:
                 - pred: the output from model (before softmax)
@@ -1139,6 +1143,49 @@ class BoundaryLoss(nn.Module):
 
         pred_b_ext = F.max_pool2d(
             pred_b, kernel_size=self.theta, stride=1, padding=(self.theta - 1) // 2)
+
+        
+        ####################################################
+        plt.figure(figsize=(20,10))  # Criar uma nova figura
+        image_to_plot = gt[0, :, :].cpu().detach().numpy()  # Mover para CPU e converter para numpy
+        plt.imshow(image_to_plot)
+        plt.title('label')
+        plt.axis('off')  # Ocultar os eixos para uma melhor visualização
+        plt.show()
+
+        for i in range(20):
+            fig, axes = plt.subplots(2, 1, figsize=(20, 5))  # 2 linhas, 1 coluna
+
+            # Plotar o primeiro canal (Canal 0)
+            image_to_plot_0 = gt_b[0, i, :, :].cpu().detach().numpy()  # Mover para CPU e converter para numpy
+            axes[0].imshow(image_to_plot_0, cmap='gray')
+            axes[0].set_title(f'gt Canal {i}')
+            axes[0].axis('off')  # Ocultar os eixos para uma melhor visualização
+            
+            # Plotar o segundo canal (Canal 1)
+            image_to_plot_1 = pred_b[0, i, :, :].cpu().detach().numpy()  # Mover para CPU e converter para numpy
+            axes[1].imshow(image_to_plot_1, cmap='gray')
+            axes[1].set_title(f'pred Canal {i}')
+            axes[1].axis('off')  # Ocultar os eixos para uma melhor visualização
+
+            plt.subplots_adjust(hspace=0.3)
+            plt.tight_layout()
+            plt.show()
+            
+        #     plt.figure(figsize=(20,10))  # Criar uma nova figura
+        #     image_to_plot = gt_b[0, i, :, :].cpu().detach().numpy()  # Mover para CPU e converter para numpy
+        #     plt.imshow(image_to_plot, cmap='gray')
+        #     plt.title(f'gt_b Canal {i}')
+        #     plt.axis('off')  # Ocultar os eixos para uma melhor visualização
+        #     plt.show()
+
+        # for i in range(20):
+        #     plt.figure(figsize=(20,10))  # Criar uma nova figura
+        #     image_to_plot = gt_b[0, i, :, :].cpu().detach().numpy()  # Mover para CPU e converter para numpy
+        #     plt.imshow(image_to_plot, cmap='gray')
+        #     plt.title(f'pred_b Canal {i}')
+        #     plt.axis('off')  # Ocultar os eixos para uma melhor visualização
+        #     plt.show()
 
 
         # reshape
@@ -1187,7 +1234,7 @@ class BoundaryLoss(nn.Module):
 
 #     print(loss)
 
-# %% ../nbs/03_cheng2023TransRVNet.ipynb 70
+# %% ../nbs/03_cheng2023TransRVNet.ipynb 73
 def calculate_frequencies(dataset):
     class_frequencies = {i: 0 for i in range(-1, 20)}
     
@@ -1208,7 +1255,7 @@ def calculate_frequencies(dataset):
     class_frequencies = list(class_frequencies.values())
     return class_frequencies
 
-# %% ../nbs/03_cheng2023TransRVNet.ipynb 73
+# %% ../nbs/03_cheng2023TransRVNet.ipynb 76
 # Function to calculate class weights
 # wc = (ft/fc)^i, where fc is the frequency of class c, and ft is the median of all class frequencies.
 def calculate_class_weights(frequencies, exponent):
@@ -1216,7 +1263,7 @@ def calculate_class_weights(frequencies, exponent):
     class_weights = (median_freq / frequencies) ** exponent
     return torch.tensor(class_weights, dtype=torch.float32)
 
-# %% ../nbs/03_cheng2023TransRVNet.ipynb 76
+# %% ../nbs/03_cheng2023TransRVNet.ipynb 79
 class TransRVNet_loss(nn.Module):
     """
     Calculates the total loss with the weighted combination of the three loss functions.
@@ -1244,12 +1291,12 @@ class TransRVNet_loss(nn.Module):
         output_softmax = self.softmax(output)
         lov_loss = self.lovasz_softmax_loss(output_softmax, target)
         
-        bd_loss = self.boundary_loss(output, target)
+        bd_loss = self.boundary_loss(output, target, mask)
 
         # Return the weighted combination of the three loss functions
         return self.Lwce*wce_loss + self.Lls*lov_loss + self.Lbd*bd_loss
 
-# %% ../nbs/03_cheng2023TransRVNet.ipynb 80
+# %% ../nbs/03_cheng2023TransRVNet.ipynb 83
 class RandomRotationTransform(nn.Module):
     """
     Applies a random rotation around the origin to the z
@@ -1278,7 +1325,7 @@ class RandomRotationTransform(nn.Module):
 
         return rotated_frame, label
 
-# %% ../nbs/03_cheng2023TransRVNet.ipynb 82
+# %% ../nbs/03_cheng2023TransRVNet.ipynb 85
 class RandomDroppingPointsTransform(nn.Module):
     """
     Randomly drops a fraction of points from a point cloud frame and its corresponding labels. 
@@ -1301,7 +1348,7 @@ class RandomDroppingPointsTransform(nn.Module):
 
         return points_dropped, labels_dropped
 
-# %% ../nbs/03_cheng2023TransRVNet.ipynb 84
+# %% ../nbs/03_cheng2023TransRVNet.ipynb 87
 class RandomSingInvertingTransform(nn.Module):
     """
     Sign inverting for the X and Y channels.
@@ -1315,7 +1362,7 @@ class RandomSingInvertingTransform(nn.Module):
 
         return frame, label
 
-# %% ../nbs/03_cheng2023TransRVNet.ipynb 87
+# %% ../nbs/03_cheng2023TransRVNet.ipynb 90
 def log_activations(logger, step, model, img):
     "Function that uses a Pytorch forward hook to log properties of activations for debugging purposes."
     def debugging_hook(module, inp, out):            
@@ -1339,7 +1386,7 @@ def log_activations(logger, step, model, img):
         depth = img[:, 4, :, :].unsqueeze(1)     
         model(reflectance, depth, xyz)
 
-# %% ../nbs/03_cheng2023TransRVNet.ipynb 88
+# %% ../nbs/03_cheng2023TransRVNet.ipynb 91
 def log_imgs(pred, label, mask, viz_tfm, logger, stage, step):
     "TODO: documentation missing"
     pred_np = pred[0].detach().cpu().numpy().argmax(0)
@@ -1352,7 +1399,7 @@ def log_imgs(pred, label, mask, viz_tfm, logger, stage, step):
     img_cmp = wandb.Image(img_cmp)
     logger.log({f"{stage}_examples": img_cmp}, step=step)
 
-# %% ../nbs/03_cheng2023TransRVNet.ipynb 89
+# %% ../nbs/03_cheng2023TransRVNet.ipynb 92
 class SemanticSegmentationTask(LightningModule):
     "Lightning Module to standardize experiments with semantic segmentation tasks."
     def __init__(self, model, loss_fn, viz_tfm, total_steps, lr=1e-1):
@@ -1381,12 +1428,13 @@ class SemanticSegmentationTask(LightningModule):
     def training_step(self, batch, batch_idx):
         stage = 'train'
         logger = self.logger.experiment
-        
+
         loss, pred, label, mask = self.step(batch, batch_idx, stage, self.train_accuracy)
-        if self.step_idx % int(0.01*self.total_steps) == 0:
-            log_activations(logger, self.step_idx, self.model, batch[0])
-        if self.step_idx % int(0.25*self.total_steps) == 0:
-            log_imgs(pred, label, mask, self.viz_tfm, logger, stage, self.step_idx)
+        if int(0.01*self.total_steps) != 0:
+            if self.step_idx % int(0.01*self.total_steps) == 0:
+                log_activations(logger, self.step_idx, self.model, batch[0])
+            if self.step_idx % int(0.25*self.total_steps) == 0:
+                log_imgs(pred, label, mask, self.viz_tfm, logger, stage, self.step_idx)
         self.manual_optimization(loss)
         self.step_idx += 1
     
