@@ -1075,7 +1075,7 @@ def mean(l, ignore_nan=False, empty=0):
         return acc
     return acc / n
 
-# %% ../nbs/03_cheng2023TransRVNet.ipynb 67
+# %% ../nbs/03_cheng2023TransRVNet.ipynb 66
 # code get from https://github.com/yiskw713/boundary_loss_for_remote_sensing
 
 # import torch
@@ -1187,7 +1187,7 @@ class BoundaryLoss(nn.Module):
 
 #     print(loss)
 
-# %% ../nbs/03_cheng2023TransRVNet.ipynb 70
+# %% ../nbs/03_cheng2023TransRVNet.ipynb 69
 def calculate_frequencies(dataset):
     class_frequencies = {i: 0 for i in range(-1, 20)}
     
@@ -1208,7 +1208,7 @@ def calculate_frequencies(dataset):
     class_frequencies = list(class_frequencies.values())
     return class_frequencies
 
-# %% ../nbs/03_cheng2023TransRVNet.ipynb 73
+# %% ../nbs/03_cheng2023TransRVNet.ipynb 72
 # Function to calculate class weights
 # wc = (ft/fc)^i, where fc is the frequency of class c, and ft is the median of all class frequencies.
 def calculate_class_weights(frequencies, exponent):
@@ -1216,7 +1216,7 @@ def calculate_class_weights(frequencies, exponent):
     class_weights = (median_freq / frequencies) ** exponent
     return torch.tensor(class_weights, dtype=torch.float32)
 
-# %% ../nbs/03_cheng2023TransRVNet.ipynb 76
+# %% ../nbs/03_cheng2023TransRVNet.ipynb 75
 class TransRVNet_loss(nn.Module):
     """
     Calculates the total loss with the weighted combination of the three loss functions.
@@ -1249,16 +1249,17 @@ class TransRVNet_loss(nn.Module):
         # Return the weighted combination of the three loss functions
         return self.Lwce*wce_loss + self.Lls*lov_loss + self.Lbd*bd_loss
 
-# %% ../nbs/03_cheng2023TransRVNet.ipynb 80
+# %% ../nbs/03_cheng2023TransRVNet.ipynb 82
 class RandomRotationTransform(nn.Module):
     """
     Applies a random rotation around the origin to the z
     axis of a given point cloud frame.
     """
 
-    def __init__(self, rotation_axis='xyz'):
+    def __init__(self, rotation_axis='xyz', apply_chance=0.5):
         super().__init__()
         self.rotation_axis = rotation_axis
+        self.apply_chance = apply_chance
 
     def get_rotation_matrix(self, axis, angle):
         return np.array([[np.cos(angle), -np.sin(angle), 0],
@@ -1266,56 +1267,68 @@ class RandomRotationTransform(nn.Module):
                              [0, 0, 1]])
 
     def forward(self, frame, label):
-        points = frame[:, :3]
-
-        # Apply a random rotation around the z-axis
-        angle = np.random.uniform(0, 2 * np.pi)
-        rotation_matrix = self.get_rotation_matrix('z', angle)
-        points = points @ rotation_matrix.T
-
-        # Combine the rotated x, y, z coordinates with the original depth and reflectance
-        rotated_frame = np.hstack((points, frame[:, 3:]))
-
-        return rotated_frame, label
-
-# %% ../nbs/03_cheng2023TransRVNet.ipynb 82
-class RandomDroppingPointsTransform(nn.Module):
-    """
-    Randomly drops a fraction of points from a point cloud frame and its corresponding labels. 
-    The fraction of points to drop is controlled by the `drop_fraction` parameter.
-    """
-    def __init__(self, drop_fraction=0.5):
-        super().__init__()
-        self.drop_fraction = drop_fraction
-
-    def forward(self, frame, label):
-        # Determine the number of points to drop
-        num_points_to_drop = int(self.drop_fraction * frame.shape[0])
-        
-        # Randomly select indices to drop
-        drop_indices = np.random.choice(frame.shape[0], num_points_to_drop, replace=False)
-        
-        # Drop the points and corresponding labels
-        points_dropped = np.delete(frame, drop_indices, axis=0)
-        labels_dropped = np.delete(label, drop_indices, axis=0)
-
-        return points_dropped, labels_dropped
-
-# %% ../nbs/03_cheng2023TransRVNet.ipynb 84
-class RandomSingInvertingTransform(nn.Module):
-    """
-    Sign inverting for the X and Y channels.
-    """
-    def __init__(self):
-        super().__init__()
-
-    def forward(self, frame, label):
-        frame[:, 0] = -frame[:, 0]
-        frame[:, 1] = -frame[:, 1]
+        # 50% of chance of this transformation being applied
+        random_chance = np.random.rand()
+        if random_chance < self.apply_chance:
+            points = frame[:, :3]
+    
+            # Apply a random rotation around the z-axis
+            angle = np.random.uniform(0, 2 * np.pi)
+            rotation_matrix = self.get_rotation_matrix('z', angle)
+            points = points @ rotation_matrix.T
+    
+            # Combine the rotated x, y, z coordinates with the original depth and reflectance
+            frame = np.hstack((points, frame[:, 3:]))
 
         return frame, label
 
-# %% ../nbs/03_cheng2023TransRVNet.ipynb 87
+# %% ../nbs/03_cheng2023TransRVNet.ipynb 84
+class RandomDroppingPointsTransform(nn.Module):
+    """
+    Randomly drops a fraction of points from a point cloud frame and its corresponding labels. 
+    The fraction of points to drop is controlled by the `drop_fraction` parameter, which can go up to 0.6.
+    """
+    def __init__(self, apply_chance=0.5):
+        super().__init__()
+        self.apply_chance = apply_chance
+
+    def forward(self, frame, label):
+        # 50% of chance of this transformation being applied
+        random_chance = np.random.rand()
+        if random_chance < self.apply_chance:
+            # Limits drop_fraction to [0, 0.6]
+            drop_fraction = 0.6 * np.random.rand()
+            
+            # Determine the number of points to drop
+            num_points_to_drop = int(drop_fraction * frame.shape[0])
+            
+            # Randomly select indices to drop
+            drop_indices = np.random.choice(frame.shape[0], num_points_to_drop, replace=False)
+            
+            # Drop the points and corresponding labels
+            frame = np.delete(frame, drop_indices, axis=0)
+            label = np.delete(label, drop_indices, axis=0)
+    
+        return frame, label
+
+# %% ../nbs/03_cheng2023TransRVNet.ipynb 86
+class RandomSingInvertingTransform(nn.Module):
+    """
+    Mirror transform for the X and Y channels.
+    """
+    def __init__(self, apply_chance=0.5):
+        super().__init__()
+        self.apply_chance = apply_chance
+
+    def forward(self, frame, label):
+        # 50% of chance of this transformation being applied
+        random_chance = np.random.rand()
+        if random_chance < self.apply_chance:
+            # frame[:, 0] = -frame[:, 0]
+            frame[:, 1] = -frame[:, 1]
+        return frame, label
+
+# %% ../nbs/03_cheng2023TransRVNet.ipynb 89
 def log_activations(logger, step, model, img):
     "Function that uses a Pytorch forward hook to log properties of activations for debugging purposes."
     def debugging_hook(module, inp, out):            
@@ -1339,7 +1352,7 @@ def log_activations(logger, step, model, img):
         depth = img[:, 4, :, :].unsqueeze(1)     
         model(reflectance, depth, xyz)
 
-# %% ../nbs/03_cheng2023TransRVNet.ipynb 88
+# %% ../nbs/03_cheng2023TransRVNet.ipynb 90
 def log_imgs(pred, label, mask, viz_tfm, logger, stage, step):
     "TODO: documentation missing"
     pred_np = pred[0].detach().cpu().numpy().argmax(0)
@@ -1352,7 +1365,7 @@ def log_imgs(pred, label, mask, viz_tfm, logger, stage, step):
     img_cmp = wandb.Image(img_cmp)
     logger.log({f"{stage}_examples": img_cmp}, step=step)
 
-# %% ../nbs/03_cheng2023TransRVNet.ipynb 89
+# %% ../nbs/03_cheng2023TransRVNet.ipynb 91
 class SemanticSegmentationTask(LightningModule):
     "Lightning Module to standardize experiments with semantic segmentation tasks."
     def __init__(self, model, loss_fn, viz_tfm, total_steps, lr=1e-1):
