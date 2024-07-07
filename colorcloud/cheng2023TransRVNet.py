@@ -1332,8 +1332,7 @@ class RandomSingInvertingTransform(nn.Module):
 def log_activations(logger, step, model, img):
     "Function that uses a Pytorch forward hook to log properties of activations for debugging purposes."
     def debugging_hook(module, inp, out):            
-        # if 'relu' in module.name:
-        if False:
+        if hasattr(module, 'name') and 'relu' in module.name:
             acts = out.detach()
             
             min_count = (acts < 1e-1).sum((0, 2, 3))
