@@ -340,7 +340,7 @@ class SemanticSegmentationLDM(LightningDataModule):
         
         if stage == "fit":
             self.ds_train = ds
-            self.ds_val = SemanticKITTIDataset(data_path, 'valid', tfms)
+            self.ds_val = SemanticKITTIDataset(data_path, 'valid', self.tfms)
             if self.remapping_rules:
                 self.ds_val.learning_remap(self.remapping_rules)
         
