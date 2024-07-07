@@ -1249,7 +1249,7 @@ class TransRVNet_loss(nn.Module):
         # Return the weighted combination of the three loss functions
         return self.Lwce*wce_loss + self.Lls*lov_loss + self.Lbd*bd_loss
 
-# %% ../nbs/03_cheng2023TransRVNet.ipynb 82
+# %% ../nbs/03_cheng2023TransRVNet.ipynb 80
 class RandomRotationTransform(nn.Module):
     """
     Applies a random rotation around the origin to the z
@@ -1282,7 +1282,7 @@ class RandomRotationTransform(nn.Module):
 
         return frame, label
 
-# %% ../nbs/03_cheng2023TransRVNet.ipynb 84
+# %% ../nbs/03_cheng2023TransRVNet.ipynb 82
 class RandomDroppingPointsTransform(nn.Module):
     """
     Randomly drops a fraction of points from a point cloud frame and its corresponding labels. 
@@ -1311,7 +1311,7 @@ class RandomDroppingPointsTransform(nn.Module):
     
         return frame, label
 
-# %% ../nbs/03_cheng2023TransRVNet.ipynb 86
+# %% ../nbs/03_cheng2023TransRVNet.ipynb 84
 class RandomSingInvertingTransform(nn.Module):
     """
     Mirror transform for the X and Y channels.
@@ -1328,7 +1328,7 @@ class RandomSingInvertingTransform(nn.Module):
             frame[:, 1] = -frame[:, 1]
         return frame, label
 
-# %% ../nbs/03_cheng2023TransRVNet.ipynb 89
+# %% ../nbs/03_cheng2023TransRVNet.ipynb 87
 def log_activations(logger, step, model, img):
     "Function that uses a Pytorch forward hook to log properties of activations for debugging purposes."
     def debugging_hook(module, inp, out):            
@@ -1351,7 +1351,7 @@ def log_activations(logger, step, model, img):
         depth = img[:, 4, :, :].unsqueeze(1)     
         model(reflectance, depth, xyz)
 
-# %% ../nbs/03_cheng2023TransRVNet.ipynb 90
+# %% ../nbs/03_cheng2023TransRVNet.ipynb 88
 def log_imgs(pred, label, mask, viz_tfm, logger, stage, step):
     "TODO: documentation missing"
     pred_np = pred[0].detach().cpu().numpy().argmax(0)
@@ -1364,7 +1364,7 @@ def log_imgs(pred, label, mask, viz_tfm, logger, stage, step):
     img_cmp = wandb.Image(img_cmp)
     logger.log({f"{stage}_examples": img_cmp}, step=step)
 
-# %% ../nbs/03_cheng2023TransRVNet.ipynb 91
+# %% ../nbs/03_cheng2023TransRVNet.ipynb 89
 class SemanticSegmentationTask(LightningModule):
     "Lightning Module to standardize experiments with semantic segmentation tasks."
     def __init__(self, model, loss_fn, viz_tfm, total_steps, lr=1e-1):
