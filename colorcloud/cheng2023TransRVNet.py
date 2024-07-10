@@ -1266,7 +1266,7 @@ class RandomRotationTransform(nn.Module):
                              [np.sin(angle), np.cos(angle), 0],
                              [0, 0, 1]])
 
-    def forward(self, frame, label):
+    def forward(self, frame, label, mask):
         # 50% of chance of this transformation being applied
         random_chance = np.random.rand()
         if random_chance < self.apply_chance:
@@ -1280,7 +1280,7 @@ class RandomRotationTransform(nn.Module):
             # Combine the rotated x, y, z coordinates with the original depth and reflectance
             frame = np.hstack((points, frame[:, 3:]))
 
-        return frame, label
+        return frame, label, mask
 
 # %% ../nbs/03_cheng2023TransRVNet.ipynb 82
 class RandomDroppingPointsTransform(nn.Module):
@@ -1292,7 +1292,7 @@ class RandomDroppingPointsTransform(nn.Module):
         super().__init__()
         self.apply_chance = apply_chance
 
-    def forward(self, frame, label):
+    def forward(self, frame, label, mask):
         # 50% of chance of this transformation being applied
         random_chance = np.random.rand()
         if random_chance < self.apply_chance:
@@ -1308,8 +1308,9 @@ class RandomDroppingPointsTransform(nn.Module):
             # Drop the points and corresponding labels
             frame = np.delete(frame, drop_indices, axis=0)
             label = np.delete(label, drop_indices, axis=0)
+            mask = np.delete(mask, drop_indices, axis=0)
     
-        return frame, label
+        return frame, label, mask
 
 # %% ../nbs/03_cheng2023TransRVNet.ipynb 84
 class RandomSingInvertingTransform(nn.Module):
@@ -1320,13 +1321,13 @@ class RandomSingInvertingTransform(nn.Module):
         super().__init__()
         self.apply_chance = apply_chance
 
-    def forward(self, frame, label):
+    def forward(self, frame, label, mask):
         # 50% of chance of this transformation being applied
         random_chance = np.random.rand()
         if random_chance < self.apply_chance:
             # frame[:, 0] = -frame[:, 0]
             frame[:, 1] = -frame[:, 1]
-        return frame, label
+        return frame, label, mask
 
 # %% ../nbs/03_cheng2023TransRVNet.ipynb 87
 def log_activations(logger, step, model, img):
