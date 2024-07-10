@@ -6,6 +6,7 @@ __all__ = ['InfUFGDataset']
 # %% ../nbs/05_braga2024datasetname.ipynb 3
 from torch.utils.data import Dataset, DataLoader
 from pathlib import Path
+from torch import nn
 import numpy as np
 
 # %% ../nbs/05_braga2024datasetname.ipynb 4
