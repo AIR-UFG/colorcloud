@@ -1035,9 +1035,10 @@ def flatten_probas(probas, labels, ignore=None):
         probas = probas.view(B, 1, H, W)
     B, C, H, W = probas.size()
     probas = probas.permute(0, 2, 3, 1).contiguous().view(-1, C)  # B * H * W, C = P, C
-    labels = labels.view(-1)
+    labels = labels.view(-1)  # flattens the label tensor to a 1D tensor so that each label corresponds to a pixel in the batch
     if ignore is None:
         return probas, labels
+    # flattens the mask tensor and uses it to select the valid elements from probas and labels
     ignore = ignore.view(-1)
     vprobas = probas[ignore.squeeze()]
     vlabels = labels[ignore]
@@ -1238,12 +1239,15 @@ class TransRVNet_loss(nn.Module):
         self.boundary_loss = BoundaryLoss()
 
     def forward(self, output, target, mask):
+        # weighted cross entropy loss
         wce_loss = self.weighted_cross_entropy_loss(output, target)
         wce_loss = wce_loss[mask].mean()
-        
+
+        # lovasz sofmaxt loss
         output_softmax = self.softmax(output)
-        lov_loss = self.lovasz_softmax_loss(output_softmax, target)
-        
+        lov_loss = self.lovasz_softmax_loss(output_softmax, target, ignore=mask)
+
+        # boundary loss
         bd_loss = self.boundary_loss(output, target)
 
         # Return the weighted combination of the three loss functions
