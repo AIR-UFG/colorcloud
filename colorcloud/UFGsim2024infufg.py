@@ -2,7 +2,7 @@
 
 # %% auto 0
 __all__ = ['UFGSimDataset', 'ProjectionSimTransform', 'ProjectionSimVizTransform', 'ProjectionToTensorTransformSim',
-           'SemanticSegmentationLDM']
+           'SemanticSegmentationSimLDM']
 
 # %% ../nbs/05_2024infufg.ipynb 2
 import torch
@@ -19,7 +19,7 @@ from .behley2019iccv import SphericalProjection
 # %% ../nbs/05_2024infufg.ipynb 4
 class UFGSimDataset(Dataset):
     "Load the UFGSim dataset ina pytorch Dataset object."
-    def __init__(self, data_path, is_train=True, transform=None):
+    def __init__(self, data_path, split='train', transform=None):
         data_path = Path(data_path)
         yaml_path = data_path/'ufg-sim.yaml'
         self.ufgsim_velodyne_path = data_path/'laser_scans'
@@ -27,11 +27,12 @@ class UFGSimDataset(Dataset):
         with open(yaml_path, 'r') as file:
             metadata = yaml.safe_load(file)
 
+        lasers = metadata['split'][split]
         self.labels_dict = metadata['labels']
 
         ufgsim_velodyne_fns = []
-
-        ufgsim_velodyne_fns += list(self.ufgsim_velodyne_path.rglob('*laser[0-9]/*.bin'))
+        for laser in lasers:
+            ufgsim_velodyne_fns += list(self.ufgsim_velodyne_path.rglob(f'laser{laser}/*.bin'))
   
         self.frame_ids = [fn.stem for fn in sorted(ufgsim_velodyne_fns)]
         self.frame_lasers = [fn.parts[-2] for fn in sorted(ufgsim_velodyne_fns)]
@@ -43,7 +44,7 @@ class UFGSimDataset(Dataset):
             self.color_map_rgb_np[k] = np.array(v[::-1], np.float32)
         
         self.transform = transform
-
+        self.is_test = (split == 'test')
     def __len__(self):
         return len(self.frame_ids)
 
@@ -87,6 +88,16 @@ class ProjectionSimTransform(nn.Module):
         depth = np.linalg.norm(scan_xyz, 2, axis=1)
 
         proj_x, proj_y, outliers = self.projection.get_xy_projections(scan_xyz, depth)
+
+        # filter outliers
+        if outliers is not None:
+            proj_x = proj_x[~outliers]
+            proj_y = proj_y[~outliers]
+            scan_xyz = scan_xyz[~outliers]
+            depth = depth[~outliers]
+            if label is not None:
+                label = label[~outliers]
+                mask = mask[~outliers]
 
         order = np.argsort(depth)[::-1]
         info_list = [scan_xyz, depth[..., np.newaxis]]
@@ -156,12 +167,11 @@ class ProjectionToTensorTransformSim(nn.Module):
         return frame_img, label_img, mask_img
 
 # %% ../nbs/05_2024infufg.ipynb 27
-class SemanticSegmentationLDM(LightningDataModule):
+class SemanticSegmentationSimLDM(LightningDataModule):
     "Lightning DataModule to facilitate reproducibility of experiments."
     def __init__(self, 
                  proj_style='spherical',
-                 proj_kargs={'W': 256, 'H': 16},
-                 remapping_rules=None,
+                 proj_kargs={'W': 440, 'H': 16},
                  train_batch_size=8, 
                  eval_batch_size=16,
                  num_workers=8
@@ -183,22 +193,18 @@ class SemanticSegmentationLDM(LightningDataModule):
         data_path = '/workspace/data'
         tfms = v2.Compose([
             ProjectionSimTransform(self.proj),
-            ProjectionToTensorTransform(),
+            ProjectionToTensorTransformSim(),
         ])
         split = stage
         if stage == 'fit':
             split = 'train'
         ds = UFGSimDataset(data_path, split, transform=tfms)
-        if self.remapping_rules:
-            ds.learning_remap(self.remapping_rules)
         if not hasattr(self, 'viz_tfm'):
-            self.viz_tfm = ProjectionSimVizTransform(ds.color_map_rgb_np, ds.learning_map_inv_np)
+            self.viz_tfm = ProjectionSimVizTransform(ds.color_map_rgb_np)
         
         if stage == "fit":
             self.ds_train = ds
             self.ds_val = UFGSimDataset(data_path, 'valid', tfms)
-            if self.remapping_rules:
-                self.ds_val.learning_remap(self.remapping_rules)
         
         if stage == "test":
             self.ds_test = ds
