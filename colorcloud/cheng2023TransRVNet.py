@@ -1329,8 +1329,9 @@ class RandomSingInvertingTransform(nn.Module):
         # 50% of chance of this transformation being applied
         random_chance = np.random.rand()
         if random_chance < self.apply_chance:
-            # frame[:, 0] = -frame[:, 0]
-            frame[:, 1] = -frame[:, 1]
+            # Inverts either the X axis or the Y axis 
+            frame_to_invert = np.random.choice([0, 1])
+            frame[:, frame_to_invert] = -frame[:, frame_to_invert]
         return frame, label, mask
 
 # %% ../nbs/03_cheng2023TransRVNet.ipynb 87
