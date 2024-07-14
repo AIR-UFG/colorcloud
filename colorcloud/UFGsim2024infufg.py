@@ -37,6 +37,17 @@ class UFGSimDataset(Dataset):
         self.frame_ids = [fn.stem for fn in sorted(ufgsim_velodyne_fns)]
         self.frame_lasers = [fn.parts[-2] for fn in sorted(ufgsim_velodyne_fns)]
 
+        self.learning_map = metadata['learning_map']
+        max_key = sorted(self.learning_map.keys())[-1]
+        self.learning_map_np = np.zeros((max_key+1,), dtype=int)
+        for k, v in self.learning_map.items():
+            self.learning_map_np[k] = v
+        
+        self.learning_map_inv = metadata['learning_map_inv']
+        self.learning_map_inv_np = np.zeros((len(self.learning_map_inv),))
+        for k, v in self.learning_map_inv.items():
+            self.learning_map_inv_np[k] = v
+        
         self.color_map_bgr = metadata['color_map']
         max_key = sorted(self.color_map_bgr.keys())[-1]
         self.color_map_rgb_np = np.zeros((max_key+1,3))
@@ -45,6 +56,19 @@ class UFGSimDataset(Dataset):
         
         self.transform = transform
         self.is_test = (split == 'test')
+
+
+    def learning_remap(self, remapping_rules):
+        new_map_np = np.zeros_like(self.learning_map_np, dtype=int)
+        max_key = sorted(remapping_rules.values())[-1]
+        new_map_inv_np = np.zeros((max_key+1,), dtype=int)
+        for k, v in remapping_rules.items():
+            new_map_np[self.learning_map_np == k] = v
+            if new_map_inv_np[v] == 0:
+                new_map_inv_np[v] = self.learning_map_inv_np[k]
+        self.learning_map_np = new_map_np
+        self.learning_map_inv_np = new_map_inv_np
+    
     def __len__(self):
         return len(self.frame_ids)
 
@@ -64,6 +88,7 @@ class UFGSimDataset(Dataset):
             z_frame = frame[:, 2]
             label = frame[:, 3].astype(np.uint8)
 
+        label = self.learning_map_np[label]
         mask = label != 0
 
         if self.transform:
