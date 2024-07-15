@@ -155,9 +155,10 @@ class ProjectionSimTransform(nn.Module):
 
 # %% ../nbs/05_2024infufg.ipynb 14
 class ProjectionSimVizTransform(nn.Module):
-    def __init__(self, color_map_rgb_np):
+    def __init__(self, color_map_rgb_np, learning_map_inv_np):
         super().__init__()
         self.color_map_rgb_np = color_map_rgb_np
+        self.learning_map_inv_np = learning_map_inv_np
 
     def scale(self, img, min_value, max_value):
         img = img.clip(min_value, max_value)
@@ -175,6 +176,7 @@ class ProjectionSimVizTransform(nn.Module):
 
         colored_label_img = None
         if label_img is not None:
+            label_img[mask_img] = self.learning_map_inv_np[label_img[mask_img]]
             colored_label_img = np.zeros(label_img.shape + (3,))
             colored_label_img[mask_img] = self.color_map_rgb_np[label_img[mask_img]]
             colored_label_img = colored_label_img.astype(int)
@@ -187,7 +189,7 @@ class ProjectionToTensorTransformSim(nn.Module):
     def forward(self, frame_img, label_img, mask_img):
         frame_img = np.transpose(frame_img, (2, 0, 1))
         frame_img = torch.from_numpy(frame_img).float()
-        label_img = torch.from_numpy(label_img)
+        label_img = torch.from_numpy(label_img.astype(np.int64))
         mask_img = torch.from_numpy(mask_img)
         return frame_img, label_img, mask_img
 
@@ -196,7 +198,7 @@ class SemanticSegmentationSimLDM(LightningDataModule):
     "Lightning DataModule to facilitate reproducibility of experiments."
     def __init__(self, 
                  proj_style='spherical',
-                 proj_kargs={'W': 440, 'H': 16},
+                 proj_kargs={'fov_up_deg': 15.,'fov_down_deg': -15., 'W': 440, 'H': 16,},
                  train_batch_size=8, 
                  eval_batch_size=16,
                  num_workers=8
@@ -204,18 +206,17 @@ class SemanticSegmentationSimLDM(LightningDataModule):
         super().__init__()
 
         proj_class = {
-        'unfold': UnfoldingProjection,
+        #'unfold': UnfoldingProjection,
         'spherical': SphericalProjection
         }
         assert proj_style in proj_class.keys()
         self.proj = proj_class[proj_style](**proj_kargs)
-        self.remapping_rules = remapping_rules
         self.train_batch_size = train_batch_size
         self.eval_batch_size = eval_batch_size
         self.num_workers = num_workers
     
     def setup(self, stage: str):
-        data_path = '/workspace/data'
+        data_path = 'A:/UFGSim'
         tfms = v2.Compose([
             ProjectionSimTransform(self.proj),
             ProjectionToTensorTransformSim(),
@@ -225,11 +226,11 @@ class SemanticSegmentationSimLDM(LightningDataModule):
             split = 'train'
         ds = UFGSimDataset(data_path, split, transform=tfms)
         if not hasattr(self, 'viz_tfm'):
-            self.viz_tfm = ProjectionSimVizTransform(ds.color_map_rgb_np)
+            self.viz_tfm = ProjectionSimVizTransform(ds.color_map_rgb_np, ds.learning_map_inv_np)
         
         if stage == "fit":
             self.ds_train = ds
-            self.ds_val = UFGSimDataset(data_path, 'valid', tfms)
+            #self.ds_val = UFGSimDataset(data_path, 'valid', tfms)
         
         if stage == "test":
             self.ds_test = ds
@@ -240,8 +241,8 @@ class SemanticSegmentationSimLDM(LightningDataModule):
     def train_dataloader(self):
         return DataLoader(self.ds_train, batch_size=self.train_batch_size, num_workers=self.num_workers, shuffle=True, drop_last=True)
 
-    def val_dataloader(self):
-        return DataLoader(self.ds_val, batch_size=self.eval_batch_size, num_workers=self.num_workers)
+    # def val_dataloader(self):
+    #     return DataLoader(self.ds_val, batch_size=self.eval_batch_size, num_workers=self.num_workers)
 
     def test_dataloader(self):
         return DataLoader(self.ds_test, batch_size=self.eval_batch_size, num_workers=self.num_workers)
