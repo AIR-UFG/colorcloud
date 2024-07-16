@@ -196,7 +196,7 @@ class MRCIAM(nn.Module):
         self.conv_1x1 = ConvBNPReLU(p["p1"]["output"] * 2 + p["p2"]["output"], p["output_conv"], kernel_size=1)
 
         # SCA Block
-        self.sac_block = SACBlock(384)
+        self.sac_block = SACBlock(p["output_conv"])
 
     def forward(self, x1, x2, x3):
       mrciam_x1 = self.mrciam_depth_reflectance(x1)
@@ -224,7 +224,8 @@ class BasicEncoderBlock(nn.Module):
         self.conv2 = ConvBNPReLU(p["conv2_in_channels"], p["conv2_out_channels"], kernel_size=3, padding=1)
         self.dilated_conv = ConvBNPReLU(p["conv2_out_channels"], p["dilated_conv_out_channels"], kernel_size=3, padding=2, dilation=2)
 
-        self.residual_conv1 = ConvBNPReLU(p["dilated_conv_out_channels"] * 4, p["residual_out_channels"], kernel_size=1)
+        residual_conv1_input_dimension = p["conv2_in_channels"] + p["conv2_out_channels"] + p["dilated_conv_out_channels"] + p["dilated_conv_out_channels"]
+        self.residual_conv1 = ConvBNPReLU(residual_conv1_input_dimension, p["residual_out_channels"], kernel_size=1)
         self.residual_conv2 = ConvBNPReLU(p["in_channels"], p["residual_out_channels"], kernel_size=1)
 
 
@@ -740,18 +741,21 @@ class SwinTransformer(nn.Module):
 
         return x
 
-# %% ../nbs/03_cheng2023TransRVNet.ipynb 55
+# %% ../nbs/03_cheng2023TransRVNet.ipynb 56
 class ConvDecoderBlock(nn.Module):
     """
     Convolution-based decoder block for the end of decoder pipeline
     """
-    def __init__(self):
+    def __init__(self,
+                p
+                ):
         super(ConvDecoderBlock, self).__init__()
 
-        self.conv_3x3_1 = ConvBNPReLU(66, 32, kernel_size=3, padding=1)
-        self.conv_3x3_2 = ConvBNPReLU(32, 16, kernel_size=3, padding=1)
-        self.dilated_conv = ConvBNPReLU(16, 8, kernel_size=3, padding=2, dilation=2)
-        self.conv_1x1 = ConvBNPReLU(64, 64, kernel_size=1)
+        self.conv_3x3_1 = ConvBNPReLU(p["in_channels"], p["conv2_in_channels"], kernel_size=3, padding=1)
+        self.conv_3x3_2 = ConvBNPReLU(p["conv2_in_channels"], p["dilated_conv_in_channels"], kernel_size=3, padding=1)
+        self.dilated_conv = ConvBNPReLU(p["dilated_conv_in_channels"], p["dilated_conv_out_channels"], kernel_size=3, padding=2, dilation=2)
+        conv_1x1_output_channel = p["conv2_in_channels"]+ p["dilated_conv_in_channels"] + p["dilated_conv_out_channels"] + p["dilated_conv_out_channels"]
+        self.conv_1x1 = ConvBNPReLU(conv_1x1_output_channel, p["output"], kernel_size=1)
 
     def forward(self, x1, x2):
         out = torch.cat((x1, x2), dim=1)
@@ -765,14 +769,14 @@ class ConvDecoderBlock(nn.Module):
 
         return out
 
-# %% ../nbs/03_cheng2023TransRVNet.ipynb 58
+# %% ../nbs/03_cheng2023TransRVNet.ipynb 60
 class Decoder(nn.Module):
-    def __init__(self, window_size, N_CLASSES):
+    def __init__(self, p, window_size, N_CLASSES):
         super(Decoder, self).__init__()
         self.bntm = SwinTransformer(window_size=window_size, embed_dim=8)
         self.upsample = nn.PixelShuffle(upscale_factor=2)
-        self.conv_decoder_block = ConvDecoderBlock()
-        self.seg_head = ConvBNPReLU(64, N_CLASSES, kernel_size=1)
+        self.conv_decoder_block = ConvDecoderBlock(p)
+        self.seg_head = ConvBNPReLU(p["output"], N_CLASSES, kernel_size=1)
 
     def forward(self, x, outs):
         out = self.bntm(x, outs)
@@ -782,13 +786,14 @@ class Decoder(nn.Module):
         out = self.seg_head(out)
         return out
 
-# %% ../nbs/03_cheng2023TransRVNet.ipynb 61
+# %% ../nbs/03_cheng2023TransRVNet.ipynb 63
 class TransVRNet(nn.Module):
     """
     """
     def __init__(self, 
                  p_mrciam,
                  p_encoder,
+                 p_decoder,
                  window_size=(4,4), 
                  N_CLASSES=20
                 ):
@@ -800,7 +805,7 @@ class TransVRNet(nn.Module):
         self.encoder_module1 = EncoderModule(p_encoder["module_1"])
         self.encoder_module2 = EncoderModule(p_encoder["module_2"])
 
-        self.decoder = Decoder(window_size=window_size, N_CLASSES=N_CLASSES)
+        self.decoder = Decoder(p=p_decoder, window_size=window_size, N_CLASSES=N_CLASSES)
 
     def forward(self, x1, x2, x3):
         # MRCIAM
@@ -813,12 +818,11 @@ class TransVRNet(nn.Module):
         x, out_encoder4 = self.encoder_module2(x)
 
         outs_encoder = [out_encoder1, out_encoder2, out_encoder3, out_encoder4]
-
         out = self.decoder(x, outs_encoder)
 
         return out
 
-# %% ../nbs/03_cheng2023TransRVNet.ipynb 66
+# %% ../nbs/03_cheng2023TransRVNet.ipynb 68
 """
 Lovasz-Softmax and Jaccard hinge loss in PyTorch
 Maxim Berman 2018 ESAT-PSI KU Leuven (MIT License)
@@ -1073,7 +1077,7 @@ def mean(l, ignore_nan=False, empty=0):
         return acc
     return acc / n
 
-# %% ../nbs/03_cheng2023TransRVNet.ipynb 69
+# %% ../nbs/03_cheng2023TransRVNet.ipynb 71
 # code get from https://github.com/yiskw713/boundary_loss_for_remote_sensing
 
 # import torch
@@ -1185,7 +1189,7 @@ class BoundaryLoss(nn.Module):
 
 #     print(loss)
 
-# %% ../nbs/03_cheng2023TransRVNet.ipynb 72
+# %% ../nbs/03_cheng2023TransRVNet.ipynb 74
 def calculate_frequencies(dataset):
     class_frequencies = {i: 0 for i in range(-1, 20)}
     
@@ -1206,7 +1210,7 @@ def calculate_frequencies(dataset):
     class_frequencies = list(class_frequencies.values())
     return class_frequencies
 
-# %% ../nbs/03_cheng2023TransRVNet.ipynb 75
+# %% ../nbs/03_cheng2023TransRVNet.ipynb 77
 # Function to calculate class weights
 # wc = (ft/fc)^i, where fc is the frequency of class c, and ft is the median of all class frequencies.
 def calculate_class_weights(frequencies, exponent):
@@ -1214,7 +1218,7 @@ def calculate_class_weights(frequencies, exponent):
     class_weights = (median_freq / frequencies) ** exponent
     return torch.tensor(class_weights, dtype=torch.float32)
 
-# %% ../nbs/03_cheng2023TransRVNet.ipynb 78
+# %% ../nbs/03_cheng2023TransRVNet.ipynb 80
 class TransRVNet_loss(nn.Module):
     """
     Calculates the total loss with the weighted combination of the three loss functions.
@@ -1250,7 +1254,7 @@ class TransRVNet_loss(nn.Module):
         # Return the weighted combination of the three loss functions
         return self.Lwce*wce_loss + self.Lls*lov_loss + self.Lbd*bd_loss
 
-# %% ../nbs/03_cheng2023TransRVNet.ipynb 83
+# %% ../nbs/03_cheng2023TransRVNet.ipynb 85
 class RandomRotationTransform(nn.Module):
     """
     Applies a random rotation around the origin to the z
@@ -1283,7 +1287,7 @@ class RandomRotationTransform(nn.Module):
 
         return frame, label, mask
 
-# %% ../nbs/03_cheng2023TransRVNet.ipynb 85
+# %% ../nbs/03_cheng2023TransRVNet.ipynb 87
 class RandomDroppingPointsTransform(nn.Module):
     """
     Randomly drops a fraction of points from a point cloud frame and its corresponding labels. 
@@ -1313,7 +1317,7 @@ class RandomDroppingPointsTransform(nn.Module):
     
         return frame, label, mask
 
-# %% ../nbs/03_cheng2023TransRVNet.ipynb 87
+# %% ../nbs/03_cheng2023TransRVNet.ipynb 89
 class RandomSingInvertingTransform(nn.Module):
     """
     Mirror transform for the X and Y channels.
@@ -1331,7 +1335,7 @@ class RandomSingInvertingTransform(nn.Module):
             frame[:, frame_to_invert] = -frame[:, frame_to_invert]
         return frame, label, mask
 
-# %% ../nbs/03_cheng2023TransRVNet.ipynb 90
+# %% ../nbs/03_cheng2023TransRVNet.ipynb 92
 def log_activations(logger, step, model, img):
     "Function that uses a Pytorch forward hook to log properties of activations for debugging purposes."
     def debugging_hook(module, inp, out):            
@@ -1354,7 +1358,7 @@ def log_activations(logger, step, model, img):
         depth = img[:, 4, :, :].unsqueeze(1)     
         model(reflectance, depth, xyz)
 
-# %% ../nbs/03_cheng2023TransRVNet.ipynb 91
+# %% ../nbs/03_cheng2023TransRVNet.ipynb 93
 def log_imgs(pred, label, mask, viz_tfm, logger, stage, step):
     "TODO: documentation missing"
     pred_np = pred[0].detach().cpu().numpy().argmax(0)
@@ -1367,7 +1371,7 @@ def log_imgs(pred, label, mask, viz_tfm, logger, stage, step):
     img_cmp = wandb.Image(img_cmp)
     logger.log({f"{stage}_examples": img_cmp}, step=step)
 
-# %% ../nbs/03_cheng2023TransRVNet.ipynb 92
+# %% ../nbs/03_cheng2023TransRVNet.ipynb 94
 class SemanticSegmentationTask(LightningModule):
     "Lightning Module to standardize experiments with semantic segmentation tasks."
     def __init__(self, model, loss_fn, viz_tfm, total_steps, lr=1e-1):
