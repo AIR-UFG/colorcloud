@@ -759,7 +759,6 @@ class ConvDecoderBlock(nn.Module):
 
     def forward(self, x1, x2):
         out = torch.cat((x1, x2), dim=1)
-
         out_conv_3x3_1 = self.conv_3x3_1(out)
         out_conv_3x3_2 = self.conv_3x3_2(out_conv_3x3_1)
         out_dilated_conv = self.dilated_conv(out_conv_3x3_2)
@@ -771,16 +770,17 @@ class ConvDecoderBlock(nn.Module):
 
 # %% ../nbs/03_cheng2023TransRVNet.ipynb 60
 class Decoder(nn.Module):
-    def __init__(self, p, window_size, N_CLASSES):
+    def __init__(self, p, p_bntm, N_CLASSES):
         super(Decoder, self).__init__()
-        self.bntm = SwinTransformer(window_size=window_size, embed_dim=8)
+        self.embed_dim = p_bntm["embed_dim"]
+        self.bntm = SwinTransformer(window_size=p_bntm["window_size"], embed_dim=self.embed_dim)
         self.upsample = nn.PixelShuffle(upscale_factor=2)
         self.conv_decoder_block = ConvDecoderBlock(p)
         self.seg_head = ConvBNPReLU(p["output"], N_CLASSES, kernel_size=1)
 
     def forward(self, x, outs):
         out = self.bntm(x, outs)
-        out = out.view(-1, 32, 512,  8).permute(0, 3, 1, 2).contiguous()
+        out = out.view(-1, 32, 512,  self.embed_dim).permute(0, 3, 1, 2).contiguous()
         out = self.upsample(out)
         out = self.conv_decoder_block(out, outs[0])
         out = self.seg_head(out)
@@ -794,7 +794,7 @@ class TransVRNet(nn.Module):
                  p_mrciam,
                  p_encoder,
                  p_decoder,
-                 window_size=(4,4), 
+                 p_bntm, 
                  N_CLASSES=20
                 ):
         super(TransVRNet, self).__init__()
@@ -805,7 +805,7 @@ class TransVRNet(nn.Module):
         self.encoder_module1 = EncoderModule(p_encoder["module_1"])
         self.encoder_module2 = EncoderModule(p_encoder["module_2"])
 
-        self.decoder = Decoder(p=p_decoder, window_size=window_size, N_CLASSES=N_CLASSES)
+        self.decoder = Decoder(p=p_decoder, p_bntm=p_bntm, N_CLASSES=N_CLASSES)
 
     def forward(self, x1, x2, x3):
         # MRCIAM
