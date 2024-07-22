@@ -19,8 +19,9 @@ from torch.optim import AdamW
 from torch.optim.lr_scheduler import OneCycleLR
 import wandb
 from torch.nn.modules.module import register_module_forward_hook
-
+from collections import OrderedDict
 from torch.autograd import Variable
+from torch.nn import Sequential
 try:
     from itertools import  ifilterfalse
 except ImportError: # py3k
@@ -37,7 +38,7 @@ __all__ = ['ConvBNPReLU', 'SACBlock', 'MRCIAMSingleChannel', 'MRCIAM', 'BasicEnc
            'SemanticSegmentationTask']
 
 # %% ../nbs/03_cheng2023TransRVNet.ipynb 10
-class ConvBNPReLU(nn.Module):
+class ConvBNPReLU(Sequential):
     "Sequential composition of 2D convolution, batch normalization and PReLU."
     def __init__(self, 
                  in_channels:int,      # input channels size
@@ -47,16 +48,11 @@ class ConvBNPReLU(nn.Module):
                  padding=0,
                  dilation=1
                 )->torch.Tensor:  # ()
-        super(ConvBNPReLU, self).__init__()
-        self.conv = nn.Conv2d(in_channels, out_channels, kernel_size, stride, padding, dilation=dilation)
-        self.batchNormalization = nn.BatchNorm2d(out_channels)
-        self.activation = nn.PReLU()
-
-    def forward(self, x):
-        out = self.conv(x)
-        out = self.batchNormalization(out)
-        out = self.activation(out)
-        return out
+        super().__init__(OrderedDict([
+            (f'conv', nn.Conv2d(in_channels, out_channels, kernel_size, stride, padding, dilation=dilation)),
+            (f'bn', nn.BatchNorm2d(out_channels)),
+            (f'prelu', nn.PReLU()),
+        ]))
 
 # %% ../nbs/03_cheng2023TransRVNet.ipynb 12
 class SACBlock(nn.Module):
@@ -1339,7 +1335,7 @@ class RandomSingInvertingTransform(nn.Module):
 def log_activations(logger, step, model, img):
     "Function that uses a Pytorch forward hook to log properties of activations for debugging purposes."
     def debugging_hook(module, inp, out):            
-        if hasattr(module, 'name') and 'relu' in module.name:
+        if hasattr(module, 'name') and 'prelu' in module.name:
             acts = out.detach()
             
             min_count = (acts < 1e-1).sum((0, 2, 3))
