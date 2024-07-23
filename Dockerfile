@@ -25,11 +25,15 @@ RUN pip install \
     lightning \
     matplotlib \
     jupyterlab-quarto \
-    jupyterlab-git
+    jupyterlab-git \
+    jupyterlab-vim
+
 
 WORKDIR /workspace/colorcloud
 COPY . /workspace/colorcloud
 RUN nbdev_install_hooks && pip install -e '.[dev]'
+
+RUN ln -sf /bin/bash /bin/sh
 
 WORKDIR /workspace
 CMD  ["jupyter", "lab", "--port=8888", "--no-browser", "--ip=0.0.0.0", "--allow-root", "--ContentsManager.allow_hidden=True"]
