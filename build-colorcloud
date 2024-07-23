@@ -1,0 +1,3 @@
+#!/usr/bin/env bash
+
+docker build --build-arg git_user_name="Matheus-lla" --build-arg git_user_email="matheus.leonel161@gmail.com" -t colorcloud .

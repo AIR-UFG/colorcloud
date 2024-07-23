@@ -4,9 +4,11 @@ FROM pytorch/pytorch:2.3.0-cuda12.1-cudnn8-runtime
 ARG DEBIAN_FRONTEND=noninteractive
 
 # best practice suggested in docs: https://docs.docker.com/develop/develop-images/instructions/#run
-RUN apt update && apt install -y \
+RUN apt update && apt upgrade -y \
+    && apt install -y \
     git \
     curl \
+    vim \
     && rm -rf /var/lib/apt/lists/* 
 
 ARG git_user_name
@@ -25,11 +27,15 @@ RUN pip install \
     lightning \
     matplotlib \
     jupyterlab-quarto \
-    jupyterlab-git
+    jupyterlab-git \
+    jupyterlab-vim
+
 
 WORKDIR /workspace/colorcloud
 COPY . /workspace/colorcloud
 RUN nbdev_install_hooks && pip install -e '.[dev]'
 
-WORKDIR /workspace
+RUN ln -sf /bin/bash /bin/sh
+
+WORKDIR /workspace/colorcloud
 CMD  ["jupyter", "lab", "--port=8888", "--no-browser", "--ip=0.0.0.0", "--allow-root", "--ContentsManager.allow_hidden=True"]
