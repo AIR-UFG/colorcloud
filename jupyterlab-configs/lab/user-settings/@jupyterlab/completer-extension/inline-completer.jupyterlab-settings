@@ -1,0 +1,17 @@
+{
+    "providers": {
+        "@jupyterlab/inline-completer:history": {
+            "enabled": false,
+            "timeout": 5000,
+            "debouncerDelay": 0,
+            "maxSuggestions": 100
+        }
+    },
+    "showWidget": "onHover",
+    "showShortcuts": true,
+    "streamingAnimation": "uncover",
+    "minLines": 0,
+    "maxLines": 0,
+    "reserveSpaceForLongest": false,
+    "editorResizeDelay": 1000
+}

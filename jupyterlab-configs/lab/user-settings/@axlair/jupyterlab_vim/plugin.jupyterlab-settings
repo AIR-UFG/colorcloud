@@ -1,0 +1,24 @@
+{
+    "enabled": true,
+    "enabledInEditors": true,
+    "extraKeybindings": [
+        {
+            "command": "<Tab>",
+            "keys": "<space><space><space><space>",
+            "context": "insert",
+            "mapfn": "noremap",
+            "enabled": true
+        },
+        {
+            "command": "<Tab>",
+            "keys": "i<space><space><space><space><Esc>",
+            "context": "normal",
+            "mapfn": "noremap",
+            "enabled": true
+        }
+    ],
+    "cmdModeKeys": {
+        "escToCmdMode": true,
+        "shiftEscOverrideBrowser": true
+    }
+}
