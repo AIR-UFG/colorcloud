@@ -2,7 +2,7 @@
 
 # %% auto 0
 __all__ = ['UFGSimDataset', 'ProjectionSimTransform', 'ProjectionSimVizTransform', 'ProjectionToTensorTransformSim',
-           'SemanticSegmentationSimLDM']
+           'ProjectionSimToPointCloud', 'SemanticSegmentationSimLDM']
 
 # %% ../nbs/05_2024infufg.ipynb 2
 import torch
@@ -93,7 +93,7 @@ class UFGSimDataset(Dataset):
 
         if self.transform:
             frame, label, mask = self.transform(frame, label, mask)
-        # return x_frame, y_frame, z_frame, label
+        # return x_frame, y_frame, z_frame, label # in case of separated training 
         return frame, label, mask
         
 
@@ -153,7 +153,7 @@ class ProjectionSimTransform(nn.Module):
 
         return frame_img, label_img, mask_img
 
-# %% ../nbs/05_2024infufg.ipynb 14
+# %% ../nbs/05_2024infufg.ipynb 16
 class ProjectionSimVizTransform(nn.Module):
     def __init__(self, color_map_rgb_np, learning_map_inv_np):
         super().__init__()
@@ -183,7 +183,7 @@ class ProjectionSimVizTransform(nn.Module):
 
         return normalized_frame_img, colored_label_img, mask_img
 
-# %% ../nbs/05_2024infufg.ipynb 19
+# %% ../nbs/05_2024infufg.ipynb 23
 class ProjectionToTensorTransformSim(nn.Module):
     "Pytorch transform that converts the projections from np.array to torch.tensor. It also changes the frame image format from (H, W, C) to (C, H, W)."
     def forward(self, frame_img, label_img, mask_img):
@@ -193,7 +193,34 @@ class ProjectionToTensorTransformSim(nn.Module):
         mask_img = torch.from_numpy(mask_img)
         return frame_img, label_img, mask_img
 
-# %% ../nbs/05_2024infufg.ipynb 27
+# %% ../nbs/05_2024infufg.ipynb 35
+class ProjectionSimToPointCloud(nn.Module):
+    def __init__(self, proj_fov_up=15.0, proj_fov_down=-15.0):
+        super().__init__()
+        self.proj_fov_up = proj_fov_up
+        self.proj_fov_down = proj_fov_down
+        self.fov_up = self.proj_fov_up / 180.0 * np.pi
+        self.fov_down = self.proj_fov_down / 180.0 * np.pi
+
+    def forward(self, image):
+        h, w = image[:,:,3].shape
+        points = []
+
+        for i in range(h):
+            for j in range(w):
+                pitch = (1 - i/h) * (self.fov_up + abs(self.fov_down)) - abs(self.fov_down)
+                yaw = ((j / w) * np.pi * 2) - np.pi
+                depth = image[:,:,3][i][j]
+
+                x = depth * np.cos(yaw)
+                y = -depth * np.sin(yaw)
+                z = depth * np.sin(pitch)
+                points.append([x, y, z])
+
+        points = np.array(points)
+        return torch.tensor(points, dtype=torch.float32)
+
+# %% ../nbs/05_2024infufg.ipynb 39
 class SemanticSegmentationSimLDM(LightningDataModule):
     "Lightning DataModule to facilitate reproducibility of experiments."
     def __init__(self, 
