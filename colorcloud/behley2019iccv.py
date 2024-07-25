@@ -2,7 +2,7 @@
 
 # %% auto 0
 __all__ = ['SemanticKITTIDataset', 'SphericalProjection', 'UnfoldingProjection', 'ProjectionTransform', 'ProjectionVizTransform',
-           'ProjectionToTensorTransform', 'SemanticSegmentationLDM']
+           'plot_projections', 'ProjectionToTensorTransform', 'SemanticSegmentationLDM']
 
 # %% ../nbs/00_behley2019iccv.ipynb 2
 import torch
@@ -169,6 +169,9 @@ class UnfoldingProjection:
         
         return proj_x, proj_y, None
 
+# %% ../nbs/00_behley2019iccv.ipynb 16
+from matplotlib import pyplot as plt
+
 # %% ../nbs/00_behley2019iccv.ipynb 21
 class ProjectionTransform(nn.Module):
     "Pytorch transform that turns a point cloud frame and its respective label into images in given projection style."
@@ -272,6 +275,17 @@ class ProjectionVizTransform(nn.Module):
         
         return normalized_frame_img, colored_label_img, mask_img
 
+# %% ../nbs/00_behley2019iccv.ipynb 30
+def plot_projections(img, label):
+    fig, axs = plt.subplots(6, 1, figsize=(20,10), layout='compressed')
+    for i, (ax, title) in enumerate(zip(axs, ['x', 'y', 'z', 'r', 'd', 'label'])):
+        if i < 5:
+            ax.imshow(img[:,:,i])
+        else:
+            ax.imshow(label)
+        ax.set_title(title)
+        ax.axis('off')
+
 # %% ../nbs/00_behley2019iccv.ipynb 35
 class ProjectionToTensorTransform(nn.Module):
     "Pytorch transform that converts the projections from np.array to torch.tensor. It also changes the frame image format from (H, W, C) to (C, H, W)."
@@ -293,7 +307,8 @@ class SemanticSegmentationLDM(LightningDataModule):
                  remapping_rules=None,
                  train_batch_size=8, 
                  eval_batch_size=16,
-                 num_workers=8
+                 num_workers=8,
+                 tfms = None
                 ):
         super().__init__()
 
@@ -307,17 +322,19 @@ class SemanticSegmentationLDM(LightningDataModule):
         self.train_batch_size = train_batch_size
         self.eval_batch_size = eval_batch_size
         self.num_workers = num_workers
+        self.tfms = tfms
     
     def setup(self, stage: str):
         data_path = '/workspace/data'
-        tfms = v2.Compose([
-            ProjectionTransform(self.proj),
-            ProjectionToTensorTransform(),
-        ])
+        if not self.tfms:
+            self.tfms = v2.Compose([
+                ProjectionTransform(self.proj),
+                ProjectionToTensorTransform(),
+            ])
         split = stage
         if stage == 'fit':
             split = 'train'
-        ds = SemanticKITTIDataset(data_path, split, transform=tfms)
+        ds = SemanticKITTIDataset(data_path, split, transform=self.tfms)
         if self.remapping_rules:
             ds.learning_remap(self.remapping_rules)
         if not hasattr(self, 'viz_tfm'):
@@ -325,7 +342,7 @@ class SemanticSegmentationLDM(LightningDataModule):
         
         if stage == "fit":
             self.ds_train = ds
-            self.ds_val = SemanticKITTIDataset(data_path, 'valid', tfms)
+            self.ds_val = SemanticKITTIDataset(data_path, 'valid', self.tfms)
             if self.remapping_rules:
                 self.ds_val.learning_remap(self.remapping_rules)
         
