@@ -278,8 +278,10 @@ class ProjectionToTensorTransform(nn.Module):
     def forward(self, frame_img, label_img, mask_img):
         frame_img = np.transpose(frame_img, (2, 0, 1))
         frame_img = torch.from_numpy(frame_img).float()
-        label_img = torch.from_numpy(label_img)
-        mask_img = torch.from_numpy(mask_img)
+        if label_img:
+            label_img = torch.from_numpy(label_img)
+        if mask_img:
+            mask_img = torch.from_numpy(mask_img)
         return frame_img, label_img, mask_img
 
 # %% ../nbs/00_behley2019iccv.ipynb 52
