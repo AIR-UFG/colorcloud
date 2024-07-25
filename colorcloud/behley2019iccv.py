@@ -293,13 +293,14 @@ class SemanticSegmentationLDM(LightningDataModule):
                  remapping_rules=None,
                  train_batch_size=8, 
                  eval_batch_size=16,
-                 num_workers=8
+                 num_workers=8,
+                 aug_tfms=None
                 ):
         super().__init__()
 
         proj_class = {
-        'unfold': UnfoldingProjection,
-        'spherical': SphericalProjection
+            'unfold': UnfoldingProjection,
+            'spherical': SphericalProjection
         }
         assert proj_style in proj_class.keys()
         self.proj = proj_class[proj_style](**proj_kargs)
@@ -307,6 +308,7 @@ class SemanticSegmentationLDM(LightningDataModule):
         self.train_batch_size = train_batch_size
         self.eval_batch_size = eval_batch_size
         self.num_workers = num_workers
+        self.aug_tfms = aug_tfms
     
     def setup(self, stage: str):
         data_path = '/workspace/data'
@@ -314,24 +316,29 @@ class SemanticSegmentationLDM(LightningDataModule):
             ProjectionTransform(self.proj),
             ProjectionToTensorTransform(),
         ])
-        split = stage
         if stage == 'fit':
             split = 'train'
+        else:
+            split = 'test'
+        
         ds = SemanticKITTIDataset(data_path, split, transform=tfms)
         if self.remapping_rules:
             ds.learning_remap(self.remapping_rules)
         if not hasattr(self, 'viz_tfm'):
             self.viz_tfm = ProjectionVizTransform(ds.color_map_rgb_np, ds.learning_map_inv_np)
         
-        if stage == "fit":
+        if stage == 'fit':
+            if self.aug_tfms:
+                ds.set_transform(v2.Compose([self.aug_tfms, tfms]))
             self.ds_train = ds
+            
             self.ds_val = SemanticKITTIDataset(data_path, 'valid', tfms)
             if self.remapping_rules:
                 self.ds_val.learning_remap(self.remapping_rules)
         
-        if stage == "test":
+        if stage == 'test':
             self.ds_test = ds
-        if stage == "predict":
+        if stage == 'predict':
             self.ds_predict = ds
             
 
