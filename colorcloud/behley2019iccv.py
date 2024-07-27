@@ -36,19 +36,25 @@ class SemanticKITTIDataset(Dataset):
         
         self.labels_dict = metadata['labels']
         
+        self.content = metadata['content']
+        max_key = sorted(self.content.keys())[-1]
+        self.content_np = np.zeros((max_key+1,))
+        for k, v in self.content.items():
+            self.content_np[k] = v
+        
         self.learning_map = metadata['learning_map']
-        max_key = sorted(self.learning_map.keys())[-1]
         self.learning_map_np = np.zeros((max_key+1,), dtype=int)
         for k, v in self.learning_map.items():
             self.learning_map_np[k] = v
         
         self.learning_map_inv = metadata['learning_map_inv']
         self.learning_map_inv_np = np.zeros((len(self.learning_map_inv),))
+        self.content_sum_np = np.zeros_like(self.learning_map_inv_np)
         for k, v in self.learning_map_inv.items():
             self.learning_map_inv_np[k] = v
+            self.content_sum_np[k] = self.content_np[self.learning_map_np == k].sum()
         
         self.color_map_bgr = metadata['color_map']
-        max_key = sorted(self.color_map_bgr.keys())[-1]
         self.color_map_rgb_np = np.zeros((max_key+1, 3))
         for k, v in self.color_map_bgr.items():
             self.color_map_rgb_np[k] = np.array(v[::-1], np.float32)
@@ -59,13 +65,19 @@ class SemanticKITTIDataset(Dataset):
     def learning_remap(self, remapping_rules):
         new_map_np = np.zeros_like(self.learning_map_np, dtype=int)
         max_key = sorted(remapping_rules.values())[-1]
-        new_map_inv_np = np.zeros((max_key+1,), dtype=int)
+        new_map_inv_np = np.zeros((max_key+1,))
         for k, v in remapping_rules.items():
             new_map_np[self.learning_map_np == k] = v
             if new_map_inv_np[v] == 0:
                 new_map_inv_np[v] = self.learning_map_inv_np[k]
+        
+        new_content_sum_np = np.zeros_like(new_map_inv_np)
+        for k in range(len(new_map_inv_np)):
+            new_content_sum_np[k] = self.content_np[new_map_np == k].sum()
+        
         self.learning_map_np = new_map_np
         self.learning_map_inv_np = new_map_inv_np
+        self.content_sum_np = new_content_sum_np
     
     def set_transform(self, transform):
         self.transform = transform
@@ -83,6 +95,7 @@ class SemanticKITTIDataset(Dataset):
         
         label = None
         mask = None
+        weight = None
         if not self.is_test:
             label_path = self.labels_path/frame_sequence/'labels'/(frame_id + '.label')
             with open(label_path, 'rb') as f:
@@ -90,6 +103,7 @@ class SemanticKITTIDataset(Dataset):
                 label = label & 0xFFFF
             label = self.learning_map_np[label]
             mask = label != 0   # see the field *learning_ignore* in the yaml file
+            weight = 1./self.content_sum_np[label]
         
         if self.transform:
             frame, label, mask = self.transform(frame, label, mask)
@@ -278,9 +292,9 @@ class ProjectionToTensorTransform(nn.Module):
     def forward(self, frame_img, label_img, mask_img):
         frame_img = np.transpose(frame_img, (2, 0, 1))
         frame_img = torch.from_numpy(frame_img).float()
-        if label_img:
+        if label_img is not None:
             label_img = torch.from_numpy(label_img)
-        if mask_img:
+        if mask_img is not None:
             mask_img = torch.from_numpy(mask_img)
         return frame_img, label_img, mask_img
 
