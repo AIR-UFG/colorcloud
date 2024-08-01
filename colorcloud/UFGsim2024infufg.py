@@ -248,10 +248,10 @@ class SemanticSegmentationSimLDM(LightningDataModule):
             ProjectionSimTransform(self.proj),
             ProjectionToTensorTransformSim(),
         ])
-        split = stage
+        #split = stage
         if stage == 'fit':
             split = 'train'
-        ds = UFGSimDataset(data_path, split, transform=tfms)
+        ds = UFGSimDataset(data_path, split='train', transform=tfms)
         if not hasattr(self, 'viz_tfm'):
             self.viz_tfm = ProjectionSimVizTransform(ds.color_map_rgb_np, ds.learning_map_inv_np)
         

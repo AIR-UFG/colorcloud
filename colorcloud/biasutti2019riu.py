@@ -162,6 +162,9 @@ class SemanticSegmentationTask(LightningModule):
         for n, m in self.model.named_modules():
             assert not hasattr(m, 'name')
             m.name = n
+
+    def forward(self, x):
+        return self.model(x)
         
     def configure_optimizers(self):
         optimizer = AdamW(self.model.parameters(), lr=self.lr, eps=1e-5)
