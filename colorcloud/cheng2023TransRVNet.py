@@ -824,18 +824,6 @@ Lovasz-Softmax and Jaccard hinge loss in PyTorch
 Maxim Berman 2018 ESAT-PSI KU Leuven (MIT License)
 """
 
-# from __future__ import print_function, division
-
-# import torch
-# from torch.autograd import Variable
-# import torch.nn.functional as F
-# import numpy as np
-# try:
-#     from itertools import  ifilterfalse
-# except ImportError: # py3k
-#     from itertools import  filterfalse as ifilterfalse
-
-
 def lovasz_grad(gt_sorted):
     """
     Computes gradient of the Lovasz extension w.r.t sorted errors
@@ -1076,11 +1064,6 @@ def mean(l, ignore_nan=False, empty=0):
 # %% ../nbs/03_cheng2023TransRVNet.ipynb 71
 # code get from https://github.com/yiskw713/boundary_loss_for_remote_sensing
 
-# import torch
-# import torch.nn as nn
-# import torch.nn.functional as F
-
-
 def one_hot(label, n_classes, requires_grad=True):
     """Return One Hot Label"""
     device = label.device
@@ -1158,32 +1141,6 @@ class BoundaryLoss(nn.Module):
         loss = torch.mean(1 - BF1)
 
         return loss
-
-
-# # for debug
-# if __name__ == "__main__":
-#     import torch.optim as optim
-#     from torchvision.models import segmentation
-
-#     device = 'cuda' if torch.cuda.is_available() else 'cpu'
-
-#     img = torch.randn(8, 3, 224, 224).to(device)
-#     gt = torch.randint(0, 10, (8, 224, 224)).to(device)
-
-#     model = segmentation.fcn_resnet50(num_classes=10).to(device)
-
-#     optimizer = optim.Adam(model.parameters(), lr=0.0001)
-#     criterion = BoundaryLoss()
-
-#     y = model(img)
-
-#     loss = criterion(y['out'], gt)
-
-#     optimizer.zero_grad()
-#     loss.backward()
-#     optimizer.step()
-
-#     print(loss)
 
 # %% ../nbs/03_cheng2023TransRVNet.ipynb 74
 def calculate_frequencies(dataset):
