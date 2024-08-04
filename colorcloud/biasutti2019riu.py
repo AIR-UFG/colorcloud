@@ -145,8 +145,19 @@ def log_imgs(pred, label, mask, viz_tfm, logger, stage, step):
     label_np = label[0].detach().cpu().numpy()
     mask_np = mask[0].detach().cpu().numpy()
     pred_np[pred_np == label_np] = 0
-    _, pred_img, _ = viz_tfm(None, pred_np, mask_np)
-    _, label_img, _ = viz_tfm(None, label_np, mask_np)
+    item = {
+        'frame': None,
+        'label': pred_np,
+        'mask': mask_np
+    }
+    
+    item = viz_tfm(item)
+    pred_img = item['label']
+
+    item['label'] = label_np
+    item = viz_tfm(item)
+    label_img = item['label']
+    
     img_cmp = np.concatenate((pred_img, label_img), axis=0)
     img_cmp = wandb.Image(img_cmp)
     logger.log({f"{stage}_examples": img_cmp}, step=step)
@@ -185,7 +196,7 @@ class SemanticSegmentationTask(LightningModule):
         
         loss, pred, label, mask = self.step(batch, batch_idx, stage, self.train_accuracy)
         if self.step_idx % int(0.01*self.total_steps) == 0:
-            log_activations(logger, self.step_idx, self.model, batch[0])
+            log_activations(logger, self.step_idx, self.model, batch['frame'])
         if self.step_idx % int(0.25*self.total_steps) == 0:
             log_imgs(pred, label, mask, self.viz_tfm, logger, stage, self.step_idx)
         self.manual_optimization(loss)
@@ -203,7 +214,11 @@ class SemanticSegmentationTask(LightningModule):
             log_imgs(pred, label, mask, self.viz_tfm, logger, stage, self.step_idx)
     
     def step(self, batch, batch_idx, stage, metric):
-        img, label, mask = batch
+        item = batch
+        img = item['frame']
+        label = item['label']
+        mask = item['mask']
+        
         label[~mask] = 0
         
         pred = self.model(img)
