@@ -30,12 +30,9 @@ except ImportError: # py3k
 # %% auto 0
 __all__ = ['ConvBNPReLU', 'SACBlock', 'MRCIAMSingleChannel', 'MRCIAM', 'BasicEncoderBlock', 'CAM', 'EncoderModule', 'GELU', 'MLP',
            'window_partition', 'window_reverse', 'WindowAttention', 'SwinTransformerBlock', 'BNTM', 'SwinTransformer',
-           'ConvDecoderBlock', 'Decoder', 'TransVRNet', 'lovasz_grad', 'iou_binary', 'iou', 'lovasz_hinge',
-           'lovasz_hinge_flat', 'flatten_binary_scores', 'StableBCELoss', 'binary_xloss', 'lovasz_softmax',
-           'lovasz_softmax_flat', 'flatten_probas', 'xloss', 'isnan', 'mean', 'one_hot', 'BoundaryLoss',
-           'calculate_frequencies', 'calculate_class_weights', 'TransRVNet_loss', 'RandomRotationTransform',
-           'RandomDroppingPointsTransform', 'RandomSingInvertingTransform', 'log_activations', 'log_imgs',
-           'SemanticSegmentationTask']
+           'ConvDecoderBlock', 'Decoder', 'TransVRNet', 'calculate_frequencies', 'calculate_class_weights',
+           'TransRVNet_loss', 'RandomRotationTransform', 'RandomDroppingPointsTransform',
+           'RandomSingInvertingTransform', 'log_activations', 'log_imgs', 'SemanticSegmentationTask']
 
 # %% ../nbs/03_cheng2023TransRVNet.ipynb 10
 class ConvBNPReLU(Sequential):
@@ -818,331 +815,13 @@ class TransVRNet(nn.Module):
 
         return out
 
-# %% ../nbs/03_cheng2023TransRVNet.ipynb 68
-"""
-Lovasz-Softmax and Jaccard hinge loss in PyTorch
-Maxim Berman 2018 ESAT-PSI KU Leuven (MIT License)
-"""
+# %% ../nbs/03_cheng2023TransRVNet.ipynb 69
+from . import lovasz_softmax_loss
 
-def lovasz_grad(gt_sorted):
-    """
-    Computes gradient of the Lovasz extension w.r.t sorted errors
-    See Alg. 1 in paper
-    """
-    p = len(gt_sorted)
-    gts = gt_sorted.sum()
-    intersection = gts - gt_sorted.float().cumsum(0)
-    union = gts + (1 - gt_sorted).float().cumsum(0)
-    jaccard = 1. - intersection / union
-    if p > 1: # cover 1-pixel case
-        jaccard[1:p] = jaccard[1:p] - jaccard[0:-1]
-    return jaccard
+# %% ../nbs/03_cheng2023TransRVNet.ipynb 72
+from . import boundary_loss
 
-
-def iou_binary(preds, labels, EMPTY=1., ignore=None, per_image=True):
-    """
-    IoU for foreground class
-    binary: 1 foreground, 0 background
-    """
-    if not per_image:
-        preds, labels = (preds,), (labels,)
-    ious = []
-    for pred, label in zip(preds, labels):
-        intersection = ((label == 1) & (pred == 1)).sum()
-        union = ((label == 1) | ((pred == 1) & (label != ignore))).sum()
-        if not union:
-            iou = EMPTY
-        else:
-            iou = float(intersection) / float(union)
-        ious.append(iou)
-    iou = mean(ious)    # mean accross images if per_image
-    return 100 * iou
-
-
-def iou(preds, labels, C, EMPTY=1., ignore=None, per_image=False):
-    """
-    Array of IoU for each (non ignored) class
-    """
-    if not per_image:
-        preds, labels = (preds,), (labels,)
-    ious = []
-    for pred, label in zip(preds, labels):
-        iou = []    
-        for i in range(C):
-            if i != ignore: # The ignored label is sometimes among predicted classes (ENet - CityScapes)
-                intersection = ((label == i) & (pred == i)).sum()
-                union = ((label == i) | ((pred == i) & (label != ignore))).sum()
-                if not union:
-                    iou.append(EMPTY)
-                else:
-                    iou.append(float(intersection) / float(union))
-        ious.append(iou)
-    ious = [mean(iou) for iou in zip(*ious)] # mean accross images if per_image
-    return 100 * np.array(ious)
-
-
-# --------------------------- BINARY LOSSES ---------------------------
-
-
-def lovasz_hinge(logits, labels, per_image=True, ignore=None):
-    """
-    Binary Lovasz hinge loss
-      logits: [B, H, W] Variable, logits at each pixel (between -infty and +infty)
-      labels: [B, H, W] Tensor, binary ground truth masks (0 or 1)
-      per_image: compute the loss per image instead of per batch
-      ignore: void class id
-    """
-    if per_image:
-        loss = mean(lovasz_hinge_flat(*flatten_binary_scores(log.unsqueeze(0), lab.unsqueeze(0), ignore))
-                          for log, lab in zip(logits, labels))
-    else:
-        loss = lovasz_hinge_flat(*flatten_binary_scores(logits, labels, ignore))
-    return loss
-
-
-def lovasz_hinge_flat(logits, labels):
-    """
-    Binary Lovasz hinge loss
-      logits: [P] Variable, logits at each prediction (between -infty and +infty)
-      labels: [P] Tensor, binary ground truth labels (0 or 1)
-      ignore: label to ignore
-    """
-    if len(labels) == 0:
-        # only void pixels, the gradients should be 0
-        return logits.sum() * 0.
-    signs = 2. * labels.float() - 1.
-    errors = (1. - logits * Variable(signs))
-    errors_sorted, perm = torch.sort(errors, dim=0, descending=True)
-    perm = perm.data
-    gt_sorted = labels[perm]
-    grad = lovasz_grad(gt_sorted)
-    loss = torch.dot(F.relu(errors_sorted), Variable(grad))
-    return loss
-
-
-def flatten_binary_scores(scores, labels, ignore=None):
-    """
-    Flattens predictions in the batch (binary case)
-    Remove labels equal to 'ignore'
-    """
-    scores = scores.view(-1)
-    labels = labels.view(-1)
-    if ignore is None:
-        return scores, labels
-    valid = (labels != ignore)
-    vscores = scores[valid]
-    vlabels = labels[valid]
-    return vscores, vlabels
-
-
-class StableBCELoss(torch.nn.modules.Module):
-    def __init__(self):
-         super(StableBCELoss, self).__init__()
-    def forward(self, input, target):
-         neg_abs = - input.abs()
-         loss = input.clamp(min=0) - input * target + (1 + neg_abs.exp()).log()
-         return loss.mean()
-
-
-def binary_xloss(logits, labels, ignore=None):
-    """
-    Binary Cross entropy loss
-      logits: [B, H, W] Variable, logits at each pixel (between -infty and +infty)
-      labels: [B, H, W] Tensor, binary ground truth masks (0 or 1)
-      ignore: void class id
-    """
-    logits, labels = flatten_binary_scores(logits, labels, ignore)
-    loss = StableBCELoss()(logits, Variable(labels.float()))
-    return loss
-
-
-# --------------------------- MULTICLASS LOSSES ---------------------------
-
-
-def lovasz_softmax(probas, labels, classes='present', per_image=False, ignore=None):
-    """
-    Multi-class Lovasz-Softmax loss
-      probas: [B, C, H, W] Variable, class probabilities at each prediction (between 0 and 1).
-              Interpreted as binary (sigmoid) output with outputs of size [B, H, W].
-      labels: [B, H, W] Tensor, ground truth labels (between 0 and C - 1)
-      classes: 'all' for all, 'present' for classes present in labels, or a list of classes to average.
-      per_image: compute the loss per image instead of per batch
-      ignore: void class labels
-    """
-    if per_image:
-        loss = mean(lovasz_softmax_flat(*flatten_probas(prob.unsqueeze(0), lab.unsqueeze(0), ignore), classes=classes)
-                          for prob, lab in zip(probas, labels))
-    else:
-        loss = lovasz_softmax_flat(*flatten_probas(probas, labels, ignore), classes=classes)
-    return loss
-
-
-def lovasz_softmax_flat(probas, labels, classes='present'):
-    """
-    Multi-class Lovasz-Softmax loss
-      probas: [P, C] Variable, class probabilities at each prediction (between 0 and 1)
-      labels: [P] Tensor, ground truth labels (between 0 and C - 1)
-      classes: 'all' for all, 'present' for classes present in labels, or a list of classes to average.
-    """
-    probas = torch.softmax(probas, dim=1)
-    
-    if probas.numel() == 0:
-        # only void pixels, the gradients should be 0
-        return probas * 0.
-    C = probas.size(1)
-    losses = []
-    class_to_sum = list(range(C)) if classes in ['all', 'present'] else classes
-    for c in class_to_sum:
-        fg = (labels == c).float() # foreground for class c
-        if (classes is 'present' and fg.sum() == 0):
-            continue
-        if C == 1:
-            if len(classes) > 1:
-                raise ValueError('Sigmoid output possible only with 1 class')
-            class_pred = probas[:, 0]
-        else:
-            class_pred = probas[:, c]
-        errors = (Variable(fg) - class_pred).abs()
-        errors_sorted, perm = torch.sort(errors, 0, descending=True)
-        perm = perm.data
-        fg_sorted = fg[perm]
-        losses.append(torch.dot(errors_sorted, Variable(lovasz_grad(fg_sorted))))
-    return mean(losses)
-
-
-def flatten_probas(probas, labels, ignore=None):
-    """
-    Flattens predictions in the batch
-    """
-    if probas.dim() == 3:
-        # assumes output of a sigmoid layer
-        B, H, W = probas.size()
-        probas = probas.view(B, 1, H, W)
-    B, C, H, W = probas.size()
-    probas = probas.permute(0, 2, 3, 1).contiguous().view(-1, C)  # B * H * W, C = P, C
-    labels = labels.view(-1)  # flattens the label tensor to a 1D tensor so that each label corresponds to a pixel in the batch
-    if ignore is None:
-        return probas, labels
-    # flattens the mask tensor and uses it to select the valid elements from probas and labels
-    ignore = ignore.view(-1)
-    vprobas = probas[ignore.squeeze()]
-    vlabels = labels[ignore]
-    return vprobas, vlabels
-
-def xloss(logits, labels, ignore=None):
-    """
-    Cross entropy loss
-    """
-    return F.cross_entropy(logits, Variable(labels), ignore_index=255)
-
-
-# --------------------------- HELPER FUNCTIONS ---------------------------
-def isnan(x):
-    return x != x
-    
-    
-def mean(l, ignore_nan=False, empty=0):
-    """
-    nanmean compatible with generators.
-    """
-    l = iter(l)
-    if ignore_nan:
-        l = ifilterfalse(isnan, l)
-    try:
-        n = 1
-        acc = next(l)
-    except StopIteration:
-        if empty == 'raise':
-            raise ValueError('Empty mean')
-        return empty
-    for n, v in enumerate(l, 2):
-        acc += v
-    if n == 1:
-        return acc
-    return acc / n
-
-# %% ../nbs/03_cheng2023TransRVNet.ipynb 71
-# code get from https://github.com/yiskw713/boundary_loss_for_remote_sensing
-
-def one_hot(label, n_classes, requires_grad=True):
-    """Return One Hot Label"""
-    device = label.device
-    
-    one_hot_label = torch.eye(
-        n_classes, device=device, requires_grad=requires_grad)[label]
-    one_hot_label = one_hot_label.transpose(1, 3).transpose(2, 3)
-
-    return one_hot_label
-
-
-class BoundaryLoss(nn.Module):
-    """Boundary Loss proposed in:
-    Alexey Bokhovkin et al., Boundary Loss for Remote Sensing Imagery Semantic Segmentation
-    https://arxiv.org/abs/1905.07852
-    """
-
-    def __init__(self, theta0=3, theta=5):
-        super().__init__()
-
-        self.theta0 = theta0
-        self.theta = theta
-
-    def forward(self, pred, gt):
-        """
-        Input:
-                - pred: the output from model (before softmax)
-                    shape (N, C, H, W)
-            - gt: ground truth map
-                    shape (N, H, w)
-        Return:
-            - boundary loss, averaged over mini-bathc
-        """
-
-        n, c, _, _ = pred.shape
-        # softmax so that predicted map can be distributed in [0, 1]
-        pred = torch.softmax(pred, dim=1)
-
-        # one-hot vector of ground truth
-        one_hot_gt = one_hot(gt, c)
-
-        # boundary map
-        gt_b = F.max_pool2d(
-            1 - one_hot_gt, kernel_size=self.theta0, stride=1, padding=(self.theta0 - 1) // 2)
-        gt_b -= 1 - one_hot_gt
-
-        pred_b = F.max_pool2d(
-            1 - pred, kernel_size=self.theta0, stride=1, padding=(self.theta0 - 1) // 2)
-        pred_b -= 1 - pred
-        
-        # extended boundary map
-        gt_b_ext = F.max_pool2d(
-            gt_b, kernel_size=self.theta, stride=1, padding=(self.theta - 1) // 2)
-
-        pred_b_ext = F.max_pool2d(
-            pred_b, kernel_size=self.theta, stride=1, padding=(self.theta - 1) // 2)
-
-
-        # reshape
-        gt_b = gt_b.view(n, c, -1)
-        pred_b = pred_b.view(n, c, -1)
-        # gt_b_ext = gt_b_ext.view(n, c, -1)
-        # pred_b_ext = pred_b_ext.view(n, c, -1)
-
-        # se precisr passar a mascara, é so aplicar no pred_b
-
-        # Precision, Recall
-        P = torch.sum(pred_b * gt_b, dim=2) / (torch.sum(pred_b, dim=2) + 1e-7)
-        R = torch.sum(pred_b * gt_b, dim=2) / (torch.sum(gt_b, dim=2) + 1e-7)
-
-        # Boundary F1 Score
-        BF1 = 2 * P * R / (P + R + 1e-7)
-
-        # summing BF1 Score for each class and average over mini-batch
-        loss = torch.mean(1 - BF1)
-
-        return loss
-
-# %% ../nbs/03_cheng2023TransRVNet.ipynb 74
+# %% ../nbs/03_cheng2023TransRVNet.ipynb 75
 def calculate_frequencies(dataset):
     class_frequencies = {i: 0 for i in range(-1, 20)}
     
@@ -1163,7 +842,7 @@ def calculate_frequencies(dataset):
     class_frequencies = list(class_frequencies.values())
     return class_frequencies
 
-# %% ../nbs/03_cheng2023TransRVNet.ipynb 77
+# %% ../nbs/03_cheng2023TransRVNet.ipynb 78
 # Function to calculate class weights
 # wc = (ft/fc)^i, where fc is the frequency of class c, and ft is the median of all class frequencies.
 def calculate_class_weights(frequencies, exponent):
@@ -1171,7 +850,7 @@ def calculate_class_weights(frequencies, exponent):
     class_weights = (median_freq / frequencies) ** exponent
     return torch.tensor(class_weights, dtype=torch.float32)
 
-# %% ../nbs/03_cheng2023TransRVNet.ipynb 80
+# %% ../nbs/03_cheng2023TransRVNet.ipynb 81
 class TransRVNet_loss(nn.Module):
     """
     Calculates the total loss with the weighted combination of the three loss functions.
@@ -1189,8 +868,7 @@ class TransRVNet_loss(nn.Module):
 
         self.weighted_cross_entropy_loss = torch.nn.CrossEntropyLoss(reduction='none', weight=self.class_weights)
         self.softmax = torch.nn.Softmax(dim=1)
-        self.lovasz_softmax_loss = lovasz_softmax
-        self.boundary_loss = BoundaryLoss()
+        self.boundary_loss = boundary_loss.BoundaryLoss()
 
     def forward(self, output, target, mask):
         # weighted cross entropy loss
@@ -1199,15 +877,15 @@ class TransRVNet_loss(nn.Module):
 
         # lovasz sofmaxt loss
         output_softmax = self.softmax(output)
-        lov_loss = self.lovasz_softmax_loss(output_softmax, target, ignore=mask)
+        lov_loss = lovasz_softmax_loss.lovasz_softmax(output_softmax, target, ignore=mask)
 
         # boundary loss
         bd_loss = self.boundary_loss(output, target)
-
+    
         # Return the weighted combination of the three loss functions
         return self.Lwce*wce_loss + self.Lls*lov_loss + self.Lbd*bd_loss
 
-# %% ../nbs/03_cheng2023TransRVNet.ipynb 85
+# %% ../nbs/03_cheng2023TransRVNet.ipynb 86
 class RandomRotationTransform(nn.Module):
     """
     Applies a random rotation around the origin to the z
@@ -1240,7 +918,7 @@ class RandomRotationTransform(nn.Module):
 
         return frame, label, mask
 
-# %% ../nbs/03_cheng2023TransRVNet.ipynb 87
+# %% ../nbs/03_cheng2023TransRVNet.ipynb 88
 class RandomDroppingPointsTransform(nn.Module):
     """
     Randomly drops a fraction of points from a point cloud frame and its corresponding labels. 
@@ -1270,7 +948,7 @@ class RandomDroppingPointsTransform(nn.Module):
     
         return frame, label, mask
 
-# %% ../nbs/03_cheng2023TransRVNet.ipynb 89
+# %% ../nbs/03_cheng2023TransRVNet.ipynb 90
 class RandomSingInvertingTransform(nn.Module):
     """
     Mirror transform for the X and Y channels.
@@ -1288,7 +966,7 @@ class RandomSingInvertingTransform(nn.Module):
             frame[:, frame_to_invert] = -frame[:, frame_to_invert]
         return frame, label, mask
 
-# %% ../nbs/03_cheng2023TransRVNet.ipynb 92
+# %% ../nbs/03_cheng2023TransRVNet.ipynb 93
 def log_activations(logger, step, model, img):
     "Function that uses a Pytorch forward hook to log properties of activations for debugging purposes."
     def debugging_hook(module, inp, out):            
@@ -1311,7 +989,7 @@ def log_activations(logger, step, model, img):
         depth = img[:, 4, :, :].unsqueeze(1)     
         model(reflectance, depth, xyz)
 
-# %% ../nbs/03_cheng2023TransRVNet.ipynb 93
+# %% ../nbs/03_cheng2023TransRVNet.ipynb 94
 def log_imgs(pred, label, mask, viz_tfm, logger, stage, step):
     "TODO: documentation missing"
     pred_np = pred[0].detach().cpu().numpy().argmax(0)
@@ -1324,7 +1002,7 @@ def log_imgs(pred, label, mask, viz_tfm, logger, stage, step):
     img_cmp = wandb.Image(img_cmp)
     logger.log({f"{stage}_examples": img_cmp}, step=step)
 
-# %% ../nbs/03_cheng2023TransRVNet.ipynb 94
+# %% ../nbs/03_cheng2023TransRVNet.ipynb 95
 class SemanticSegmentationTask(LightningModule):
     "Lightning Module to standardize experiments with semantic segmentation tasks."
     def __init__(self, model, loss_fn, viz_tfm, total_steps, lr=1e-1):
