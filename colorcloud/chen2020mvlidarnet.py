@@ -27,9 +27,9 @@ class ConvBNReLU(Sequential):
 
     def init_params(self):
         for n, p in self.named_parameters():
-            if re.search(r'conv\.weight', n):
+            if re.search('conv\.weight', n):
                 kaiming_normal_(p, nonlinearity=self.nonlinearity)
-            if re.search(r'bn\.bias', n):
+            if re.search('bn\.bias', n):
                 constant_(p, 0.1)
 
 # %% ../nbs/02_chen2020mvlidarnet.ipynb 7
@@ -134,7 +134,7 @@ class Decoder(Module):
 
     def init_params(self):
         for n, p in self.named_parameters():
-            if re.search(r'up\da\.weight', n):
+            if re.search('up\da\.weight', n):
                 kaiming_normal_(p, nonlinearity='linear')
     
     def forward(self, enc_features):

@@ -34,9 +34,9 @@ class Block(Sequential):
     
     def init_params(self):
         for n, p in self.named_parameters():
-            if re.search(r'conv\d\.weight', n):
+            if re.search('conv\d\.weight', n):
                 kaiming_normal_(p, nonlinearity='relu')
-            if re.search(r'bn\d\.bias', n):
+            if re.search('bn\d\.bias', n):
                 constant_(p, 0.1)
 
 # %% ../nbs/01_biasutti2019riu.ipynb 16
@@ -71,7 +71,7 @@ class Decoder(Module):
 
     def init_params(self):
         for n, p in self.named_parameters():
-            if re.search(r'upconvs\.\d\.weight', n):
+            if re.search('upconvs\.\d\.weight', n):
                 kaiming_normal_(p, nonlinearity='linear')
     
     def forward(self, enc_features):
@@ -98,9 +98,9 @@ class RIUNet(Module):
 
     def init_params(self):
         for n, p in self.named_parameters():
-            if re.search(r'head\.weight', n):
+            if re.search('head\.weight', n):
                 kaiming_normal_(p, nonlinearity='linear')
-            if re.search(r'head\.bias', n):
+            if re.search('head\.bias', n):
                 zeros_(p)
     
     def forward(self, x):
