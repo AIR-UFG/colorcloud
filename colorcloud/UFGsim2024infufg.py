@@ -295,7 +295,7 @@ class SemanticSegmentationSimLDM(LightningDataModule):
         self.num_workers = num_workers
     
     def setup(self, stage: str):
-        data_path = 'A:/UFGSim'
+        data_path = '/workspace/data'
         tfms = v2.Compose([
             ProjectionSimTransform(self.proj),
             ProjectionToTensorTransformSim(),
