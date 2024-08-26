@@ -22,6 +22,7 @@ from torch.nn.modules.module import register_module_forward_hook
 from collections import OrderedDict
 from torch.autograd import Variable
 from torch.nn import Sequential
+from PIL import Image
 try:
     from itertools import  ifilterfalse
 except ImportError: # py3k
@@ -872,6 +873,7 @@ class TransRVNet_loss(nn.Module):
 
     def forward(self, output, target, mask):
         # weighted cross entropy loss
+        target = target.long()
         wce_loss = self.weighted_cross_entropy_loss(output, target)
         wce_loss = wce_loss[mask].mean()
 
@@ -902,11 +904,11 @@ class RandomRotationTransform(nn.Module):
                              [np.sin(angle), np.cos(angle), 0],
                              [0, 0, 1]])
 
-    def forward(self, frame, label, mask):
+    def forward(self, item):       
         # 50% of chance of this transformation being applied
         random_chance = np.random.rand()
         if random_chance < self.apply_chance:
-            points = frame[:, :3]
+            points = item["frame"][:, :3]
     
             # Apply a random rotation around the z-axis
             angle = np.random.uniform(0, 2 * np.pi)
@@ -914,9 +916,9 @@ class RandomRotationTransform(nn.Module):
             points = points @ rotation_matrix.T
     
             # Combine the rotated x, y, z coordinates with the original depth and reflectance
-            frame = np.hstack((points, frame[:, 3:]))
+            item["frame"] = np.hstack((points, item["frame"][:, 3:]))
 
-        return frame, label, mask
+        return item
 
 # %% ../nbs/03_cheng2023TransRVNet.ipynb 88
 class RandomDroppingPointsTransform(nn.Module):
@@ -928,7 +930,7 @@ class RandomDroppingPointsTransform(nn.Module):
         super().__init__()
         self.apply_chance = apply_chance
 
-    def forward(self, frame, label, mask):
+    def forward(self, item):
         # 50% of chance of this transformation being applied
         random_chance = np.random.rand()
         if random_chance < self.apply_chance:
@@ -936,17 +938,17 @@ class RandomDroppingPointsTransform(nn.Module):
             drop_fraction = 0.6 * np.random.rand()
             
             # Determine the number of points to drop
-            num_points_to_drop = int(drop_fraction * frame.shape[0])
+            num_points_to_drop = int(drop_fraction * item["frame"].shape[0])
             
             # Randomly select indices to drop
-            drop_indices = np.random.choice(frame.shape[0], num_points_to_drop, replace=False)
+            drop_indices = np.random.choice(item["frame"].shape[0], num_points_to_drop, replace=False)
             
             # Drop the points and corresponding labels
-            frame = np.delete(frame, drop_indices, axis=0)
-            label = np.delete(label, drop_indices, axis=0)
-            mask = np.delete(mask, drop_indices, axis=0)
+            item["frame"] = np.delete(item["frame"], drop_indices, axis=0)
+            item["label"] = np.delete(item["label"], drop_indices, axis=0)
+            item["mask"] = np.delete(item["mask"], drop_indices, axis=0)
     
-        return frame, label, mask
+        return item
 
 # %% ../nbs/03_cheng2023TransRVNet.ipynb 90
 class RandomSingInvertingTransform(nn.Module):
@@ -957,14 +959,14 @@ class RandomSingInvertingTransform(nn.Module):
         super().__init__()
         self.apply_chance = apply_chance
 
-    def forward(self, frame, label, mask):
+    def forward(self, item):
         # 50% of chance of this transformation being applied
         random_chance = np.random.rand()
         if random_chance < self.apply_chance:
             # Inverts either the X axis or the Y axis 
             frame_to_invert = np.random.choice([0, 1])
-            frame[:, frame_to_invert] = -frame[:, frame_to_invert]
-        return frame, label, mask
+            item["frame"][:, frame_to_invert] = -item["frame"][:, frame_to_invert]
+        return item
 
 # %% ../nbs/03_cheng2023TransRVNet.ipynb 93
 def log_activations(logger, step, model, img):
@@ -990,17 +992,46 @@ def log_activations(logger, step, model, img):
         model(reflectance, depth, xyz)
 
 # %% ../nbs/03_cheng2023TransRVNet.ipynb 94
-def log_imgs(pred, label, mask, viz_tfm, logger, stage, step):
-    "TODO: documentation missing"
-    pred_np = pred[0].detach().cpu().numpy().argmax(0)
-    label_np = label[0].detach().cpu().numpy()
-    mask_np = mask[0].detach().cpu().numpy()
-    pred_np[pred_np == label_np] = 0
-    _, pred_img, _ = viz_tfm(None, pred_np, mask_np)
-    _, label_img, _ = viz_tfm(None, label_np, mask_np)
-    img_cmp = np.concatenate((pred_img, label_img), axis=0)
-    img_cmp = wandb.Image(img_cmp)
-    logger.log({f"{stage}_examples": img_cmp}, step=step)
+def log_imgs(pred, label, mask, viz_tfm, logger, stage, step, save_image_locally=True):
+    """
+    Logs predicted and ground truth images during model training/evaluation, 
+    optionally saving them locally.
+    """
+    def to_numpy(tensor):
+        return tensor[0].detach().cpu().numpy()
+    
+    pred_np = to_numpy(pred).argmax(0)
+    label_np = to_numpy(label)
+    mask_np = to_numpy(mask)
+
+    altered_pred_np = pred_np.copy()
+    # Set matching predictions to 0
+    altered_pred_np[altered_pred_np == label_np] = 0
+    
+    item = {
+        "frame": None,
+        "label": pred_np,
+        "mask": mask_np,
+        "weight": None
+    }
+    pred_img = viz_tfm(item)["label"]
+
+    item["label"] = altered_pred_np
+    altered_pred_img = viz_tfm(item)["label"]
+    
+    item["label"] = label_np
+    label_img = viz_tfm(item)["label"]
+    
+    img_cmp = np.concatenate((label_img, altered_pred_img, pred_img), axis=0)
+    
+    img_cmp_wandb = wandb.Image(img_cmp)
+    logger.log({f"{stage}_examples": img_cmp_wandb}, step=step)
+
+    if save_image_locally:
+        img_cmp = img_cmp.astype(np.uint8)
+        img_cmp_pil = Image.fromarray(img_cmp)
+        save_path = f"../../step_images/{stage}examples_step{step}.png"
+        img_cmp_pil.save(save_path)
 
 # %% ../nbs/03_cheng2023TransRVNet.ipynb 95
 class SemanticSegmentationTask(LightningModule):
@@ -1038,7 +1069,7 @@ class SemanticSegmentationTask(LightningModule):
         step_25 = max(int(0.25 * self.total_steps), 1)
         
         if self.step_idx % step_01 == 0:
-            log_activations(logger, self.step_idx, self.model, batch[0])
+            log_activations(logger, self.step_idx, self.model, batch["frame"])
         if self.step_idx % step_25 == 0:
             log_imgs(pred, label, mask, self.viz_tfm, logger, stage, self.step_idx)
 
@@ -1057,7 +1088,7 @@ class SemanticSegmentationTask(LightningModule):
             log_imgs(pred, label, mask, self.viz_tfm, logger, stage, self.step_idx)
     
     def step(self, batch, batch_idx, stage, metric):
-        img, label, mask = batch
+        img, label, mask, weight = batch["frame"], batch["label"], batch["mask"], batch["weight"]
 
         # Separate channels
         xyz = img[:, :3, :, :]
