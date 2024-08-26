@@ -838,7 +838,8 @@ def calculate_frequencies(data_path = '/workspace/data'):
     
     content = metadata['content']
     learning_map = metadata['learning_map']
-    
+
+    # remap the ids of the classes
     mapped_ratios = {}
     for i, ratio in content.items():
         mapped_key = learning_map[i]
