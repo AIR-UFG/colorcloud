@@ -4,6 +4,8 @@
 from __future__ import print_function, division
 
 import torch 
+from pathlib import Path
+import yaml
 import torch.nn as nn
 import torch.nn.functional as F
 from torchvision.transforms import functional as transforms_F
@@ -823,35 +825,43 @@ from . import lovasz_softmax_loss
 from . import boundary_loss
 
 # %% ../nbs/03_cheng2023TransRVNet.ipynb 75
-def calculate_frequencies(dataset):
-    class_frequencies = {i: 0 for i in range(-1, 20)}
+def calculate_frequencies(data_path = '/workspace/data'):
+    """
+    Uses the ratios in the semantic kitti yaml file to calculate the frequency of each class 
+    in the semantic kitti dataset.
+    """
+    data_path = Path(data_path)
+    yaml_path = data_path/'semantic-kitti.yaml'
     
-    for img, labels, _ in dataset:
-        # Flatten the label array to count occurrences
-        flattened_labels = labels.flatten()
-        # Count the occurrences of each class
-        unique, counts = np.unique(flattened_labels, return_counts=True)
-        # Update the frequency dictionary
-        for cls, count in zip(unique, counts):
-            class_frequencies[cls] += count
+    with open(yaml_path, 'r') as file:
+        metadata = yaml.safe_load(file)
+    
+    content = metadata['content']
+    learning_map = metadata['learning_map']
+    
+    mapped_ratios = {}
+    for i, ratio in content.items():
+        mapped_key = learning_map[i]
+        if mapped_key not in mapped_ratios:
+            mapped_ratios[mapped_key] = 0    
+        mapped_ratios[mapped_key] += ratio
+    
+    mapped_ratios = sorted(mapped_ratios.items())
+    frequencies = [x[1] for x in mapped_ratios]
 
-    # change cases where frequency is 0 to 1
-    for key, item in class_frequencies.items():
-        if item == 0:
-            class_frequencies[key] = 1
+    return frequencies
 
-    class_frequencies = list(class_frequencies.values())
-    return class_frequencies
-
-# %% ../nbs/03_cheng2023TransRVNet.ipynb 78
-# Function to calculate class weights
-# wc = (ft/fc)^i, where fc is the frequency of class c, and ft is the median of all class frequencies.
+# %% ../nbs/03_cheng2023TransRVNet.ipynb 77
 def calculate_class_weights(frequencies, exponent):
+    """
+    Uses the class frequencies to calculate the weights.
+    wc = (ft/fc)^i, where fc is the frequency of class c, and ft is the median of all class frequencies.
+    """
     median_freq = np.median(frequencies)
     class_weights = (median_freq / frequencies) ** exponent
     return torch.tensor(class_weights, dtype=torch.float32)
 
-# %% ../nbs/03_cheng2023TransRVNet.ipynb 81
+# %% ../nbs/03_cheng2023TransRVNet.ipynb 80
 class TransRVNet_loss(nn.Module):
     """
     Calculates the total loss with the weighted combination of the three loss functions.
@@ -862,10 +872,10 @@ class TransRVNet_loss(nn.Module):
         self.Lwce = 1.0
         self.Lls = 3.0
         self.Lbd = 1.0
-        self.class_weights = torch.Tensor([4.6610e-01, 6.9278e-01, 2.4999e+02, 2.4999e+02, 2.4999e+02,
-        1.7731e+00, 9.8434e+00, 2.4999e+02, 2.4999e+02, 1.2124e-01, 2.5104e+00,
-        2.5584e-01, 1.0000e+00, 6.0830e-01, 2.6738e-01, 1.3546e-01, 1.5246e+00,
-        2.4108e-01, 9.4718e-01, 2.6560e+00]).to(device)
+        
+        self.class_frequencies = calculate_frequencies()
+        self.exponent_i = 0.5
+        self.class_weights = calculate_class_weights(self.class_frequencies, self.exponent_i)
 
         self.weighted_cross_entropy_loss = torch.nn.CrossEntropyLoss(reduction='none', weight=self.class_weights)
         self.softmax = torch.nn.Softmax(dim=1)
@@ -887,7 +897,7 @@ class TransRVNet_loss(nn.Module):
         # Return the weighted combination of the three loss functions
         return self.Lwce*wce_loss + self.Lls*lov_loss + self.Lbd*bd_loss
 
-# %% ../nbs/03_cheng2023TransRVNet.ipynb 86
+# %% ../nbs/03_cheng2023TransRVNet.ipynb 85
 class RandomRotationTransform(nn.Module):
     """
     Applies a random rotation around the origin to the z
@@ -920,7 +930,7 @@ class RandomRotationTransform(nn.Module):
 
         return item
 
-# %% ../nbs/03_cheng2023TransRVNet.ipynb 88
+# %% ../nbs/03_cheng2023TransRVNet.ipynb 87
 class RandomDroppingPointsTransform(nn.Module):
     """
     Randomly drops a fraction of points from a point cloud frame and its corresponding labels. 
@@ -950,7 +960,7 @@ class RandomDroppingPointsTransform(nn.Module):
     
         return item
 
-# %% ../nbs/03_cheng2023TransRVNet.ipynb 90
+# %% ../nbs/03_cheng2023TransRVNet.ipynb 89
 class RandomSingInvertingTransform(nn.Module):
     """
     Mirror transform for the X and Y channels.
@@ -968,7 +978,7 @@ class RandomSingInvertingTransform(nn.Module):
             item["frame"][:, frame_to_invert] = -item["frame"][:, frame_to_invert]
         return item
 
-# %% ../nbs/03_cheng2023TransRVNet.ipynb 93
+# %% ../nbs/03_cheng2023TransRVNet.ipynb 92
 def log_activations(logger, step, model, img):
     "Function that uses a Pytorch forward hook to log properties of activations for debugging purposes."
     def debugging_hook(module, inp, out):            
@@ -991,7 +1001,7 @@ def log_activations(logger, step, model, img):
         depth = img[:, 4, :, :].unsqueeze(1)     
         model(reflectance, depth, xyz)
 
-# %% ../nbs/03_cheng2023TransRVNet.ipynb 94
+# %% ../nbs/03_cheng2023TransRVNet.ipynb 93
 def log_imgs(pred, label, mask, viz_tfm, logger, stage, step, save_image_locally=True):
     """
     Logs predicted and ground truth images during model training/evaluation, 
@@ -1033,7 +1043,7 @@ def log_imgs(pred, label, mask, viz_tfm, logger, stage, step, save_image_locally
         save_path = f"../../step_images/{stage}examples_step{step}.png"
         img_cmp_pil.save(save_path)
 
-# %% ../nbs/03_cheng2023TransRVNet.ipynb 95
+# %% ../nbs/03_cheng2023TransRVNet.ipynb 94
 class SemanticSegmentationTask(LightningModule):
     "Lightning Module to standardize experiments with semantic segmentation tasks."
     def __init__(self, model, loss_fn, viz_tfm, total_steps, lr=1e-1):
