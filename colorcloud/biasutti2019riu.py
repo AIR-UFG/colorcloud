@@ -178,9 +178,9 @@ class SemanticSegmentationTask(LightningModule):
 
         self.step_idx = 0
         
-        for n, m in self.model.named_modules():
-            assert not hasattr(m, 'name')
-            m.name = n
+        # for n, m in self.model.named_modules():
+        #     assert not hasattr(m, 'name')
+        #     m.name = n
 
     def forward(self, x):
         return self.model(x)
