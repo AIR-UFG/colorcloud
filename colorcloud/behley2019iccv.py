@@ -2,7 +2,7 @@
 
 # %% auto 0
 __all__ = ['SemanticKITTIDataset', 'SphericalProjection', 'UnfoldingProjection', 'ProjectionTransform', 'ProjectionVizTransform',
-           'ProjectionToTensorTransform', 'SemanticSegmentationLDM']
+           'plot_projections', 'ProjectionToTensorTransform', 'SemanticSegmentationLDM']
 
 # %% ../nbs/00_behley2019iccv.ipynb 2
 import torch
@@ -13,6 +13,7 @@ from pathlib import Path
 import numpy as np
 from lightning import LightningDataModule
 from torchvision.transforms import v2
+from matplotlib import pyplot as plt
 
 # %% ../nbs/00_behley2019iccv.ipynb 4
 class SemanticKITTIDataset(Dataset):
@@ -189,7 +190,7 @@ class UnfoldingProjection:
         
         return proj_x, proj_y, None
 
-# %% ../nbs/00_behley2019iccv.ipynb 22
+# %% ../nbs/00_behley2019iccv.ipynb 21
 class ProjectionTransform(nn.Module):
     "Pytorch transform that turns a point cloud frame and its respective label, mask and weight arrays into images in given projection style."
     def __init__(self, projection):
@@ -271,7 +272,7 @@ class ProjectionTransform(nn.Module):
         }
         return item
 
-# %% ../nbs/00_behley2019iccv.ipynb 30
+# %% ../nbs/00_behley2019iccv.ipynb 29
 class ProjectionVizTransform(nn.Module):
     "Pytorch transform to preprocess projection images for proper visualization."
     def __init__(self, color_map_rgb_np, learning_map_inv_np):
@@ -318,7 +319,28 @@ class ProjectionVizTransform(nn.Module):
         }
         return item
 
-# %% ../nbs/00_behley2019iccv.ipynb 37
+# %% ../nbs/00_behley2019iccv.ipynb 32
+def plot_projections(img, label, channels=['x', 'y', 'z', 'r', 'd'], channels_map = {"x": 0, "y": 1, "z": 2, "r": 3, "d": 4}):
+    """
+    Plots projections of specified channels from a multi-channel image along with a label image.
+    """
+    num_channels = len(channels)
+    fig_size_vertical = 2*num_channels
+    fig, axs = plt.subplots(num_channels + 1, 1, figsize=(20, fig_size_vertical))
+    
+    for i, (ax, title) in enumerate(zip(axs, channels + ['label'])):
+        if i < num_channels:
+            j = channels_map[channels[i]]
+            ax.imshow(img[:, :, j])
+        else:
+            ax.imshow(label)
+        ax.set_title(title)
+        ax.axis('off')
+    
+    plt.tight_layout()
+    plt.show()
+
+# %% ../nbs/00_behley2019iccv.ipynb 38
 class ProjectionToTensorTransform(nn.Module):
     "Pytorch transform that converts the projections from np.array to torch.tensor. It also changes the frame image format from (H, W, C) to (C, H, W)."
     def forward(self, item):
@@ -343,7 +365,7 @@ class ProjectionToTensorTransform(nn.Module):
         }
         return item
 
-# %% ../nbs/00_behley2019iccv.ipynb 54
+# %% ../nbs/00_behley2019iccv.ipynb 55
 class SemanticSegmentationLDM(LightningDataModule):
     "Lightning DataModule to facilitate reproducibility of experiments."
     def __init__(self, 
