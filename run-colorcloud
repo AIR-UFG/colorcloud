@@ -8,7 +8,7 @@ DOCKER_OPTS="$DOCKER_OPTS --env SSH_AUTH_SOCK=/ssh-agent"
 DOCKER_OPTS="$DOCKER_OPTS -v /home/matheus/.ssh:/root/.ssh:ro"
 DOCKER_OPTS="$DOCKER_OPTS -v /home/matheus/desktop/air/colorcloud/jupyterlab-configs/lab:/root/.jupyter/lab"
 # copia a data para dentro do container
-DOCKER_OPTS="$DOCKER_OPTS -v /home/matheus/desktop/air/datasets/data2/:/data/"
+DOCKER_OPTS="$DOCKER_OPTS -v /home/matheus/desktop/air/datasets/data2/:/workspace/data/"
 DOCKER_OPTS="$DOCKER_OPTS --gpus all"
 DOCKER_OPTS="$DOCKER_OPTS --ipc=host"
 DOCKER_OPTS="$DOCKER_OPTS --network=host"
