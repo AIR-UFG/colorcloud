@@ -32,9 +32,9 @@ __all__ = ['ConvBNPReLU', 'SACBlock', 'MRCIAMSingleChannel', 'MRCIAM', 'BasicEnc
            'ConvDecoderBlock', 'Decoder', 'TransVRNet', 'lovasz_grad', 'iou_binary', 'iou', 'lovasz_hinge',
            'lovasz_hinge_flat', 'flatten_binary_scores', 'StableBCELoss', 'binary_xloss', 'lovasz_softmax',
            'lovasz_softmax_flat', 'flatten_probas', 'xloss', 'isnan', 'mean', 'one_hot', 'BoundaryLoss',
-           'calculate_frequencies', 'calculate_class_weights', 'TransRVNet_loss', 'RandomRotationTransform',
-           'RandomDroppingPointsTransform', 'RandomSingInvertingTransform', 'log_activations', 'log_imgs',
-           'SemanticSegmentationTask']
+           'calculate_frequencies', 'calculate_class_weights', 'TransRVNet_loss', 'dice_coefficient',
+           'RandomRotationTransform', 'RandomDroppingPointsTransform', 'RandomSingInvertingTransform',
+           'log_activations', 'log_imgs', 'SemanticSegmentationTask']
 
 # %% ../nbs/03_cheng2023TransRVNet.ipynb 10
 class ConvBNPReLU(nn.Module):
@@ -1125,13 +1125,18 @@ class BoundaryLoss(nn.Module):
         # softmax so that predicted map can be distributed in [0, 1]
         pred = torch.softmax(pred, dim=1)
 
+        print('n: ', n, '   c: ', c, ' pred: ', pred.shape)
         # one-hot vector of ground truth
         one_hot_gt = one_hot(gt, c)
+        print('onehot: ', one_hot_gt.shape)
+        print('gt: ', gt.shape)
+        print('mask: ', mask.shape)
 
         # boundary map
-        gt_b = F.max_pool2d(
-            1 - one_hot_gt, kernel_size=self.theta0, stride=1, padding=(self.theta0 - 1) // 2)
+        gt_b = F.max_pool2d(1 - one_hot_gt, kernel_size=self.theta0, stride=1, padding=(self.theta0 - 1) // 2)
         gt_b -= 1 - one_hot_gt
+
+        print('gt_b: ', gt_b.shape)
 
         pred_b = F.max_pool2d(
             1 - pred, kernel_size=self.theta0, stride=1, padding=(self.theta0 - 1) // 2)
@@ -1146,31 +1151,31 @@ class BoundaryLoss(nn.Module):
 
         
         ####################################################
-        plt.figure(figsize=(20,10))  # Criar uma nova figura
-        image_to_plot = gt[0, :, :].cpu().detach().numpy()  # Mover para CPU e converter para numpy
-        plt.imshow(image_to_plot)
-        plt.title('label')
-        plt.axis('off')  # Ocultar os eixos para uma melhor visualização
-        plt.show()
+        # plt.figure(figsize=(20,10))  # Criar uma nova figura
+        # image_to_plot = gt[0, :, :].cpu().detach().numpy()  # Mover para CPU e converter para numpy
+        # plt.imshow(image_to_plot)
+        # plt.title('label')
+        # plt.axis('off')  # Ocultar os eixos para uma melhor visualização
+        # plt.show()
 
-        for i in range(20):
-            fig, axes = plt.subplots(2, 1, figsize=(20, 5))  # 2 linhas, 1 coluna
+        # for i in range(20):
+        #     fig, axes = plt.subplots(2, 1, figsize=(20, 5))  # 2 linhas, 1 coluna
 
-            # Plotar o primeiro canal (Canal 0)
-            image_to_plot_0 = gt_b[0, i, :, :].cpu().detach().numpy()  # Mover para CPU e converter para numpy
-            axes[0].imshow(image_to_plot_0, cmap='gray')
-            axes[0].set_title(f'gt Canal {i}')
-            axes[0].axis('off')  # Ocultar os eixos para uma melhor visualização
+        #     # Plotar o primeiro canal (Canal 0)
+        #     image_to_plot_0 = gt_b[0, i, :, :].cpu().detach().numpy()  # Mover para CPU e converter para numpy
+        #     axes[0].imshow(image_to_plot_0, cmap='gray')
+        #     axes[0].set_title(f'gt Canal {i}')
+        #     axes[0].axis('off')  # Ocultar os eixos para uma melhor visualização
             
-            # Plotar o segundo canal (Canal 1)
-            image_to_plot_1 = pred_b[0, i, :, :].cpu().detach().numpy()  # Mover para CPU e converter para numpy
-            axes[1].imshow(image_to_plot_1, cmap='gray')
-            axes[1].set_title(f'pred Canal {i}')
-            axes[1].axis('off')  # Ocultar os eixos para uma melhor visualização
+        #     # Plotar o segundo canal (Canal 1)
+        #     image_to_plot_1 = pred_b[0, i, :, :].cpu().detach().numpy()  # Mover para CPU e converter para numpy
+        #     axes[1].imshow(image_to_plot_1, cmap='gray')
+        #     axes[1].set_title(f'pred Canal {i}')
+        #     axes[1].axis('off')  # Ocultar os eixos para uma melhor visualização
 
-            plt.subplots_adjust(hspace=0.3)
-            plt.tight_layout()
-            plt.show()
+        #     plt.subplots_adjust(hspace=0.3)
+        #     plt.tight_layout()
+        #     plt.show()
             
         #     plt.figure(figsize=(20,10))  # Criar uma nova figura
         #     image_to_plot = gt_b[0, i, :, :].cpu().detach().numpy()  # Mover para CPU e converter para numpy
@@ -1193,6 +1198,7 @@ class BoundaryLoss(nn.Module):
         pred_b = pred_b.view(n, c, -1)
         # gt_b_ext = gt_b_ext.view(n, c, -1)
         # pred_b_ext = pred_b_ext.view(n, c, -1)
+        print('\npredb: ', pred_b.shape)
 
         # se precisr passar a mascara, é so aplicar no pred_b
 
@@ -1296,7 +1302,33 @@ class TransRVNet_loss(nn.Module):
         # Return the weighted combination of the three loss functions
         return self.Lwce*wce_loss + self.Lls*lov_loss + self.Lbd*bd_loss
 
-# %% ../nbs/03_cheng2023TransRVNet.ipynb 83
+# %% ../nbs/03_cheng2023TransRVNet.ipynb 82
+def dice_coefficient(pred, target, epsilon=1e-6):
+    # Aplica argmax para obter a classe predita em cada pixel
+    pred_classes = torch.argmax(pred, dim=1)  # [batch, height, width]
+    
+    # Converte o target para long para comparação com pred_classes
+    target = target.long()
+    
+    # Calcula o Dice Coefficient para cada classe
+    dice_scores = []
+    for class_idx in range(pred.shape[1]):
+        pred_class = (pred_classes == class_idx).float()  # Pixels que a rede previu como essa classe
+        target_class = (target == class_idx).float()  # Pixels que realmente pertencem a essa classe
+
+        # Interseção e união para essa classe
+        intersection = torch.sum(pred_class * target_class)
+        union = torch.sum(pred_class) + torch.sum(target_class)
+
+        # Calcula o Dice Coefficient
+        dice_score = (2 * intersection + epsilon) / (union + epsilon)
+        dice_scores.append(dice_score)
+    
+    # Retorna a média do Dice Coefficient entre todas as classes
+    return torch.mean(torch.tensor(dice_scores))
+
+
+# %% ../nbs/03_cheng2023TransRVNet.ipynb 84
 class RandomRotationTransform(nn.Module):
     """
     Applies a random rotation around the origin to the z
@@ -1325,7 +1357,7 @@ class RandomRotationTransform(nn.Module):
 
         return rotated_frame, label
 
-# %% ../nbs/03_cheng2023TransRVNet.ipynb 85
+# %% ../nbs/03_cheng2023TransRVNet.ipynb 86
 class RandomDroppingPointsTransform(nn.Module):
     """
     Randomly drops a fraction of points from a point cloud frame and its corresponding labels. 
@@ -1348,7 +1380,7 @@ class RandomDroppingPointsTransform(nn.Module):
 
         return points_dropped, labels_dropped
 
-# %% ../nbs/03_cheng2023TransRVNet.ipynb 87
+# %% ../nbs/03_cheng2023TransRVNet.ipynb 88
 class RandomSingInvertingTransform(nn.Module):
     """
     Sign inverting for the X and Y channels.
@@ -1362,7 +1394,7 @@ class RandomSingInvertingTransform(nn.Module):
 
         return frame, label
 
-# %% ../nbs/03_cheng2023TransRVNet.ipynb 90
+# %% ../nbs/03_cheng2023TransRVNet.ipynb 91
 def log_activations(logger, step, model, img):
     "Function that uses a Pytorch forward hook to log properties of activations for debugging purposes."
     def debugging_hook(module, inp, out):            
@@ -1386,7 +1418,7 @@ def log_activations(logger, step, model, img):
         depth = img[:, 4, :, :].unsqueeze(1)     
         model(reflectance, depth, xyz)
 
-# %% ../nbs/03_cheng2023TransRVNet.ipynb 91
+# %% ../nbs/03_cheng2023TransRVNet.ipynb 92
 def log_imgs(pred, label, mask, viz_tfm, logger, stage, step):
     "TODO: documentation missing"
     pred_np = pred[0].detach().cpu().numpy().argmax(0)
@@ -1399,7 +1431,7 @@ def log_imgs(pred, label, mask, viz_tfm, logger, stage, step):
     img_cmp = wandb.Image(img_cmp)
     logger.log({f"{stage}_examples": img_cmp}, step=step)
 
-# %% ../nbs/03_cheng2023TransRVNet.ipynb 92
+# %% ../nbs/03_cheng2023TransRVNet.ipynb 93
 class SemanticSegmentationTask(LightningModule):
     "Lightning Module to standardize experiments with semantic segmentation tasks."
     def __init__(self, model, loss_fn, viz_tfm, total_steps, lr=1e-1):
@@ -1430,11 +1462,11 @@ class SemanticSegmentationTask(LightningModule):
         logger = self.logger.experiment
 
         loss, pred, label, mask = self.step(batch, batch_idx, stage, self.train_accuracy)
-        if int(0.01*self.total_steps) != 0:
-            if self.step_idx % int(0.01*self.total_steps) == 0:
-                log_activations(logger, self.step_idx, self.model, batch[0])
-            if self.step_idx % int(0.25*self.total_steps) == 0:
-                log_imgs(pred, label, mask, self.viz_tfm, logger, stage, self.step_idx)
+        # if int(0.01*self.total_steps) != 0:
+        #     if self.step_idx % int(0.01*self.total_steps) == 0:
+        #         log_activations(logger, self.step_idx, self.model, batch[0])
+        #     if self.step_idx % int(0.25*self.total_steps) == 0:
+        #         log_imgs(pred, label, mask, self.viz_tfm, logger, stage, self.step_idx)
         self.manual_optimization(loss)
         self.step_idx += 1
     
@@ -1446,8 +1478,8 @@ class SemanticSegmentationTask(LightningModule):
         logger = self.logger.experiment
         
         _, pred, label, mask = self.step(batch, batch_idx, stage, self.val_accuracy)
-        if batch_idx == 0:
-            log_imgs(pred, label, mask, self.viz_tfm, logger, stage, self.step_idx)
+        # if batch_idx == 0:
+        #     log_imgs(pred, label, mask, self.viz_tfm, logger, stage, self.step_idx)
     
     def step(self, batch, batch_idx, stage, metric):
         img, label, mask = batch
@@ -1464,6 +1496,8 @@ class SemanticSegmentationTask(LightningModule):
         
         label[~mask] = 0
         loss = self.loss_fn(pred, label, mask)
+        print('dice: ', dice_coefficient(pred, label))
+
 
         pred_f = torch.permute(pred, (0, 2, 3, 1)) # N,C,H,W -> N,H,W,C
         pred_f = torch.flatten(pred_f, 0, -2)      # N,H,W,C -> N*H*W,C
