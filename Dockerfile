@@ -9,11 +9,6 @@ RUN apt update && apt install -y \
     curl \
     && rm -rf /var/lib/apt/lists/* 
 
-ARG git_user_name
-ARG git_user_email
-RUN git config --global user.name "$git_user_name" && \
-    git config --global user.email $git_user_email 
-
 # install quarto and its jupyterlab extension: https://quarto.org/docs/get-started/hello/jupyter.html
 RUN curl -LO https://www.quarto.org/download/latest/quarto-linux-amd64.deb && \
     dpkg -i quarto-linux-amd64.deb && \

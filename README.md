@@ -20,11 +20,11 @@ pip install -e '.[dev]'
 ``` sh
 git clone https://github.com/AIR-UFG/colorcloud.git
 cd colorcloud
-docker build --build-arg git_user_name="<your_name>" --build-arg git_user_email="<your_email>" -t colorcloud .
+docker build -t colorcloud .
 ```
 
 2.  After the image is built, run a container:
 
 ``` sh
-docker run --gpus all --ipc=host --network=host --name <name_your_container> colorcloud:latest
+docker run --gpus all --ipc=host --network=host --mount type=bind,source=~/.gitconfig,target=/etc/gitconfig --name <name_your_container> colorcloud:latest
 ```
