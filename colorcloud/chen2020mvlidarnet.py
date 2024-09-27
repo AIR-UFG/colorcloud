@@ -11,6 +11,7 @@ from torch.nn.init import kaiming_normal_, constant_, zeros_, normal_
 from collections import OrderedDict
 from lightning import LightningModule
 from torchmetrics.classification import Accuracy
+from torchmetrics.segmentation import MeanIoU
 from torch.nn.modules.module import register_module_forward_hook
 import re
 import wandb
@@ -262,6 +263,8 @@ class SemanticSegmentationTask(LightningModule):
         self.total_steps = total_steps
         self.train_accuracy = Accuracy(task="multiclass", num_classes=model.n_classes)
         self.val_accuracy = Accuracy(task="multiclass", num_classes=model.n_classes)
+        self.train_miou = MeanIoU(num_classes=13)
+        self.val_miou = MeanIoU(num_classes=13)
         self.automatic_optimization = False
 
         self.step_idx = 0
@@ -284,8 +287,10 @@ class SemanticSegmentationTask(LightningModule):
 
         step_01 = max(int(0.01 * self.total_steps), 1)
         step_25 = max(int(0.25 * self.total_steps), 1)
+
+        metrics = {"accuracy": self.train_accuracy, "miou": self.train_miou}
+        loss, pred, label, mask = self.step(batch, batch_idx, stage, metrics)
         
-        loss, pred, label, mask = self.step(batch, batch_idx, stage, self.train_accuracy)
         if self.step_idx % step_01 == 0:
             log_activations(logger, self.step_idx, self.model, batch['frame'])
         if self.step_idx % step_25 == 0:
@@ -299,12 +304,13 @@ class SemanticSegmentationTask(LightningModule):
     def validation_step(self, batch, batch_idx):
         stage = 'val'
         logger = self.logger.experiment
-        
-        _, pred, label, mask = self.step(batch, batch_idx, stage, self.val_accuracy)
+
+        metrics = {"accuracy": self.val_accuracy, "miou": self.val_miou}
+        _, pred, label, mask = self.step(batch, batch_idx, stage, metrics)
         if batch_idx == 0:
             log_imgs(pred, label, mask, self.viz_tfm, logger, stage, self.step_idx)
     
-    def step(self, batch, batch_idx, stage, metric):
+    def step(self, batch, batch_idx, stage, metrics):
         item = batch
         img = item['frame']
         label = item['label']
@@ -317,15 +323,21 @@ class SemanticSegmentationTask(LightningModule):
         loss = self.loss_fn(pred, label)
         loss = loss[mask]
         loss = loss.mean()
-
+        
         pred_f = torch.permute(pred, (0, 2, 3, 1)) # N,C,H,W -> N,H,W,C
         pred_f = torch.flatten(pred_f, 0, -2)      # N,H,W,C -> N*H*W,C
         mask_f = torch.flatten(mask)               # N,H,W   -> N*H*W
         pred_m = pred_f[mask_f, :]
         label_m = label[mask]
-        metric(pred_m, label_m)
+        metrics["accuracy"](pred_m, label_m)
         
-        self.log(f"{stage}_acc_step", metric)
+        pred_labels = torch.argmax(pred, dim=1)
+        mask_miou = (label != 0)
+        pred_labels[~mask] = 0
+        metrics["miou"](pred_labels, label)
+
+        self.log(f"{stage}_acc_step", metrics["accuracy"])
+        self.log(f"{stage}_mean_iou_step", metrics["miou"])
         self.log(f"{stage}_loss_step", loss.log10())
 
         return loss, pred, label, mask
