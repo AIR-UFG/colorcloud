@@ -12,6 +12,7 @@ from collections import OrderedDict
 from lightning import LightningModule
 from torchmetrics.classification import Accuracy
 from torchmetrics.segmentation import MeanIoU
+from torchmetrics.classification import Dice
 from torch.nn.modules.module import register_module_forward_hook
 import re
 import wandb
@@ -210,7 +211,7 @@ def log_activations(logger, step, model, img):
         model(img)
 
 # %% ../nbs/02_chen2020mvlidarnet.ipynb 20
-def log_imgs(pred, label, mask, viz_tfm, logger, stage, step, save_image_locally=True):
+def log_imgs(pred, label, mask, viz_tfm, logger, stage, step, save_image_locally=False):
     """
     Logs predicted and ground truth images during model training/evaluation, 
     optionally saving them locally.
@@ -265,6 +266,8 @@ class SemanticSegmentationTask(LightningModule):
         self.val_accuracy = Accuracy(task="multiclass", num_classes=model.n_classes)
         self.train_miou = MeanIoU(num_classes=13)
         self.val_miou = MeanIoU(num_classes=13)
+        self.train_dice = Dice(num_classes=13)
+        self.val_dice = Dice(num_classes=13)
         self.automatic_optimization = False
 
         self.step_idx = 0
@@ -288,7 +291,7 @@ class SemanticSegmentationTask(LightningModule):
         step_01 = max(int(0.01 * self.total_steps), 1)
         step_25 = max(int(0.25 * self.total_steps), 1)
 
-        metrics = {"accuracy": self.train_accuracy, "miou": self.train_miou}
+        metrics = {"accuracy": self.train_accuracy, "miou": self.train_miou, "dice": self.train_dice}
         loss, pred, label, mask = self.step(batch, batch_idx, stage, metrics)
         
         if self.step_idx % step_01 == 0:
@@ -305,7 +308,7 @@ class SemanticSegmentationTask(LightningModule):
         stage = 'val'
         logger = self.logger.experiment
 
-        metrics = {"accuracy": self.val_accuracy, "miou": self.val_miou}
+        metrics = {"accuracy": self.val_accuracy, "miou": self.val_miou, "dice": self.val_dice}
         _, pred, label, mask = self.step(batch, batch_idx, stage, metrics)
         if batch_idx == 0:
             log_imgs(pred, label, mask, self.viz_tfm, logger, stage, self.step_idx)
@@ -335,9 +338,11 @@ class SemanticSegmentationTask(LightningModule):
         mask_miou = (label != 0)
         pred_labels[~mask] = 0
         metrics["miou"](pred_labels, label)
+        metrics["dice"](pred_labels, label)
 
         self.log(f"{stage}_acc_step", metrics["accuracy"])
         self.log(f"{stage}_mean_iou_step", metrics["miou"])
+        self.log(f"{stage}_dice_step", metrics["dice"])
         self.log(f"{stage}_loss_step", loss.log10())
 
         return loss, pred, label, mask
