@@ -49,10 +49,11 @@ class SemanticKITTIDataset(Dataset):
         
         self.learning_map_inv = metadata['learning_map_inv']
         self.learning_map_inv_np = np.zeros((len(self.learning_map_inv),), dtype=np.uint32)
-        self.content_sum_np = np.zeros_like(self.learning_map_inv_np, dtype=np.float32)
+        content_sum_np = np.zeros_like(self.learning_map_inv_np, dtype=np.float32)
         for k, v in self.learning_map_inv.items():
             self.learning_map_inv_np[k] = v
-            self.content_sum_np[k] = self.content_np[self.learning_map_np == k].sum()
+            content_sum_np[k] = self.content_np[self.learning_map_np == k].sum()
+        self.content_weights = 1./content_sum_np
         
         self.color_map_bgr = metadata['color_map']
         self.color_map_rgb_np = np.zeros((max_key+1, 3), dtype=np.float32)
@@ -77,7 +78,7 @@ class SemanticKITTIDataset(Dataset):
         
         self.learning_map_np = new_map_np
         self.learning_map_inv_np = new_map_inv_np
-        self.content_sum_np = new_content_sum_np
+        self.content_weights = 1./new_content_sum_np
     
     def set_transform(self, transform):
         self.transform = transform
@@ -95,7 +96,6 @@ class SemanticKITTIDataset(Dataset):
         
         label = None
         mask = None
-        weight = None
         if not self.is_test:
             label_path = self.labels_path/frame_sequence/'labels'/(frame_id + '.label')
             with open(label_path, 'rb') as f:
@@ -103,20 +103,18 @@ class SemanticKITTIDataset(Dataset):
                 label = label & 0xFFFF
             label = self.learning_map_np[label]
             mask = label != 0   # see the field *learning_ignore* in the yaml file
-            weight = 1./self.content_sum_np[label]
         
         item = {
             'frame': frame,
             'label': label,
-            'mask': mask,
-            'weight': weight
+            'mask': mask
         }
         if self.transform:
             item = self.transform(item)
         
         return item
 
-# %% ../nbs/00_behley2019iccv.ipynb 13
+# %% ../nbs/00_behley2019iccv.ipynb 12
 class SphericalProjection:
     "Calculate yaw and pitch angles for each point and quantize these angles into image grid."
     def __init__(self, fov_up_deg, fov_down_deg, W, H):
@@ -154,7 +152,7 @@ class SphericalProjection:
         
         return proj_x, proj_y, outliers
 
-# %% ../nbs/00_behley2019iccv.ipynb 15
+# %% ../nbs/00_behley2019iccv.ipynb 14
 class UnfoldingProjection:
     "Assume the points are sorted in increasing yaw order and line number."
     def __init__(self, W, H):
@@ -189,9 +187,9 @@ class UnfoldingProjection:
         
         return proj_x, proj_y, None
 
-# %% ../nbs/00_behley2019iccv.ipynb 22
+# %% ../nbs/00_behley2019iccv.ipynb 21
 class ProjectionTransform(nn.Module):
-    "Pytorch transform that turns a point cloud frame and its respective label, mask and weight arrays into images in given projection style."
+    "Pytorch transform that turns a point cloud frame and its respective label and mask arrays into images in given projection style."
     def __init__(self, projection):
         super().__init__()
         self.projection = projection
@@ -202,7 +200,6 @@ class ProjectionTransform(nn.Module):
         frame = item['frame']
         label = item['label']
         mask = item['mask']
-        weight = item['weight']
         
         # get point_cloud components
         scan_xyz = frame[:,:3]
@@ -227,7 +224,6 @@ class ProjectionTransform(nn.Module):
             if label is not None:
                 label = label[~outliers]
                 mask = mask[~outliers]
-                weight = weight[~outliers]
         
         # order in decreasing depth
         order = np.argsort(depth)[::-1]
@@ -237,7 +233,6 @@ class ProjectionTransform(nn.Module):
             depth[..., np.newaxis]
         ]
         if label is not None:
-            info_list += [weight[..., np.newaxis]]
             info_list += [mask[..., np.newaxis]]
             info_list += [label[..., np.newaxis]]
             
@@ -252,26 +247,23 @@ class ProjectionTransform(nn.Module):
         projections_img[proj_y, proj_x] = scan_info
         
         if label is not None:
-            frame_img = projections_img[:,:,:-3]
+            frame_img = projections_img[:,:,:-2]
             label_img = projections_img[:,:,-1].astype(np.int32)
             mask_img = projections_img[:,:,-2].astype(bool)
             mask_img = mask_img & (label_img > -1)
-            weight_img = projections_img[:,:,-3]
         else:
             frame_img = projections_img
             label_img = None
             mask_img = projections_img[:,:,-1] >= 0
-            weight_img = None
         
         item = {
             'frame': frame_img,
             'label': label_img,
             'mask': mask_img,
-            'weight': weight_img
         }
         return item
 
-# %% ../nbs/00_behley2019iccv.ipynb 30
+# %% ../nbs/00_behley2019iccv.ipynb 28
 class ProjectionVizTransform(nn.Module):
     "Pytorch transform to preprocess projection images for proper visualization."
     def __init__(self, color_map_rgb_np, learning_map_inv_np):
@@ -291,7 +283,6 @@ class ProjectionVizTransform(nn.Module):
         frame_img = item['frame']
         label_img = item['label']
         mask_img = item['mask']
-        weight_img = item['weight']
         
         normalized_frame_img = None
         if frame_img is not None:
@@ -314,24 +305,21 @@ class ProjectionVizTransform(nn.Module):
             'frame': normalized_frame_img,
             'label': colored_label_img,
             'mask': mask_img,
-            'weight': weight_img
         }
         return item
 
-# %% ../nbs/00_behley2019iccv.ipynb 37
+# %% ../nbs/00_behley2019iccv.ipynb 35
 class ProjectionToTensorTransform(nn.Module):
     "Pytorch transform that converts the projections from np.array to torch.tensor. It also changes the frame image format from (H, W, C) to (C, H, W)."
     def forward(self, item):
         frame_img = item['frame']
         label_img = item['label']
         mask_img = item['mask']
-        weight_img = item['weight']
         
         frame_img = np.transpose(frame_img, (2, 0, 1))
         frame_img = torch.from_numpy(frame_img).float()
         if label_img is not None:
             label_img = torch.from_numpy(label_img)
-            weight_img = torch.from_numpy(weight_img)
         if mask_img is not None:
             mask_img = torch.from_numpy(mask_img)
 
@@ -339,11 +327,10 @@ class ProjectionToTensorTransform(nn.Module):
             'frame': frame_img,
             'label': label_img,
             'mask': mask_img,
-            'weight': weight_img
         }
         return item
 
-# %% ../nbs/00_behley2019iccv.ipynb 54
+# %% ../nbs/00_behley2019iccv.ipynb 52
 class SemanticSegmentationLDM(LightningDataModule):
     "Lightning DataModule to facilitate reproducibility of experiments."
     def __init__(self, 
