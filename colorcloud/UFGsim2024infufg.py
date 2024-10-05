@@ -37,13 +37,12 @@ class UFGSimDataset(Dataset):
         self.frame_ids = [fn.stem for fn in sorted(ufgsim_velodyne_fns)]
         self.frame_lasers = [fn.parts[-2] for fn in sorted(ufgsim_velodyne_fns)]
 
-
         self.content = metadata['content']
         max_key = sorted(self.content.keys())[-1]
         self.content_np = np.zeros((max_key+1,), dtype=np.float32)
         for k, v in self.content.items():
             self.content_np[k] = v
-        
+
         self.learning_map = metadata['learning_map']
         max_key = sorted(self.learning_map.keys())[-1]
         self.learning_map_np = np.zeros((max_key+1,), dtype=int)
@@ -105,7 +104,7 @@ class UFGSimDataset(Dataset):
             'frame': frame,
             'label': label,
             'mask': mask,
-            #'weight': weight,
+            'weight': weight
         }
         if self.transform:
             item = self.transform(item)
