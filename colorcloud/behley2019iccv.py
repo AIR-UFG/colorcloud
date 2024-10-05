@@ -340,7 +340,7 @@ def plot_projections(img, label, channels=['x', 'y', 'z', 'r', 'd'], channels_ma
     plt.tight_layout()
     plt.show()
 
-# %% ../nbs/00_behley2019iccv.ipynb 38
+# %% ../nbs/00_behley2019iccv.ipynb 39
 class ProjectionToTensorTransform(nn.Module):
     "Pytorch transform that converts the projections from np.array to torch.tensor. It also changes the frame image format from (H, W, C) to (C, H, W)."
     def forward(self, item):
@@ -365,7 +365,7 @@ class ProjectionToTensorTransform(nn.Module):
         }
         return item
 
-# %% ../nbs/00_behley2019iccv.ipynb 55
+# %% ../nbs/00_behley2019iccv.ipynb 56
 class SemanticSegmentationLDM(LightningDataModule):
     "Lightning DataModule to facilitate reproducibility of experiments."
     def __init__(self, 

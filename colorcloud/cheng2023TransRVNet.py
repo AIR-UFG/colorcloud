@@ -825,13 +825,13 @@ from . import lovasz_softmax_loss
 from . import boundary_loss
 
 # %% ../nbs/03_cheng2023TransRVNet.ipynb 75
-def calculate_frequencies(data_path = '/workspace/data'):
+def calculate_frequencies(data_path = '/workspace/data', file_name = 'semantic-kitti.yaml'):
     """
     Uses the ratios in the semantic kitti yaml file to calculate the frequency of each class 
     in the semantic kitti dataset.
     """
     data_path = Path(data_path)
-    yaml_path = data_path/'semantic-kitti.yaml'
+    yaml_path = data_path/file_name
     
     with open(yaml_path, 'r') as file:
         metadata = yaml.safe_load(file)
@@ -867,14 +867,14 @@ class TransRVNet_loss(nn.Module):
     """
     Calculates the total loss with the weighted combination of the three loss functions.
     """
-    def __init__(self, device):
+    def __init__(self, device, file_name_yaml=None):
         super().__init__()
         # The weight of each loss
         self.Lwce = 1.0
         self.Lls = 3.0
         self.Lbd = 1.0
         
-        self.class_frequencies = calculate_frequencies()
+        self.class_frequencies = calculate_frequencies(file_name=file_name_yaml)
         self.exponent_i = 0.5
         self.class_weights = calculate_class_weights(self.class_frequencies, self.exponent_i)
 
