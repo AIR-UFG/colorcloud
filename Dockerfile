@@ -30,6 +30,12 @@ RUN pip install \
     jupyterlab-git \
     jupyterlab-vim
 
+RUN curl -o ~/.git-completion.bash https://raw.githubusercontent.com/git/git/refs/heads/master/contrib/completion/git-completion.bash 
+RUN curl -o ~/.git-prompt.sh https://raw.githubusercontent.com/git/git/refs/heads/master/contrib/completion/git-prompt.sh
+
+RUN echo ". ~/.git-completion.bash" >> ~/.bashrc && \
+    echo ". ~/.git-prompt.sh" >> ~/.bashrc && \
+    echo "PS1='[\u@\h \W\$(__git_ps1 \" (%s)\")]\$ '" >> ~/.bashrc
 
 WORKDIR /workspace/colorcloud
 COPY . /workspace/colorcloud
@@ -38,4 +44,5 @@ RUN nbdev_install_hooks && pip install -e '.[dev]'
 RUN ln -sf /bin/bash /bin/sh
 
 WORKDIR /workspace/colorcloud
-CMD  ["jupyter", "lab", "--port=8888", "--no-browser", "--ip=0.0.0.0", "--allow-root", "--ContentsManager.allow_hidden=True"]
+# CMD  ["jupyter", "lab", "--port=8888", "--no-browser", "--ip=0.0.0.0", "--allow-root", "--ContentsManager.allow_hidden=True"]
+# jupyter lab --port=8888 --no-browser --ip=0.0.0.0 --allow-root --ContentsManager.allow_hidden=True

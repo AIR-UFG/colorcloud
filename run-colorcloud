@@ -1,18 +1,24 @@
 #!/usr/bin/env bash
 
 IMG="colorcloud:latest"
-CONTAINER_NAME=" --name transrvnet"
+
+if [[ $# -eq 0 ]] ; then
+    CONTAINER_NAME=" --name transrvnet"
+else
+    CONTAINER_NAME="--name $1"
+fi
 
 DOCKER_OPTS="$DOCKER_OPTS -v $SSH_AUTH_SOCK:/ssh-agent"
 DOCKER_OPTS="$DOCKER_OPTS --env SSH_AUTH_SOCK=/ssh-agent"
 DOCKER_OPTS="$DOCKER_OPTS -v /home/matheus/.ssh:/root/.ssh:ro"
 DOCKER_OPTS="$DOCKER_OPTS -v /home/matheus/desktop/air/colorcloud/jupyterlab-configs/lab:/root/.jupyter/lab"
 # copia a data para dentro do container
-DOCKER_OPTS="$DOCKER_OPTS -v /home/matheus/desktop/air/datasets/data2/:/workspace/data/"
+DOCKER_OPTS="$DOCKER_OPTS -v /home/matheus/desktop/air/datasets/data3/:/workspace/data/"
 DOCKER_OPTS="$DOCKER_OPTS --gpus all"
 DOCKER_OPTS="$DOCKER_OPTS --ipc=host"
 DOCKER_OPTS="$DOCKER_OPTS --network=host"
 DOCKER_OPTS="$DOCKER_OPTS --rm"
+DOCKER_OPTS="$DOCKER_OPTS -it"
 
 echo $DOCKER_OPTS
 
@@ -20,3 +26,4 @@ docker run \
     $DOCKER_OPTS \
     $CONTAINER_NAME \
     $IMG \
+    bash
