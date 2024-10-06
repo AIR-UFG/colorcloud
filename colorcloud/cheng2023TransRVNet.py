@@ -958,7 +958,7 @@ class RandomDroppingPointsTransform(nn.Module):
             item["frame"] = np.delete(item["frame"], drop_indices, axis=0)
             item["label"] = np.delete(item["label"], drop_indices, axis=0)
             item["mask"] = np.delete(item["mask"], drop_indices, axis=0)
-            item["weight"] = np.delete(item["weight"], drop_indices, axis=0)
+            # item["weight"] = np.delete(item["weight"], drop_indices, axis=0)
     
         return item
 
