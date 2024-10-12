@@ -183,23 +183,33 @@ class MRCIAM(nn.Module):
     3 input types, the xyz, reflectance and depth
     """
     def __init__(self,
-                 p
+                 p,
+                 using_reflectance=True
                 )->torch.Tensor:
         super(MRCIAM, self).__init__()
         self.mrciam_depth_reflectance = MRCIAMSingleChannel(p["p1"])
         self.mrciam_xyz = MRCIAMSingleChannel(p["p2"])
 
-        self.conv_1x1 = ConvBNPReLU(p["p1"]["output"] * 2 + p["p2"]["output"], p["output_conv"], kernel_size=1)
+        self.using_reflectance = using_reflectance
+
+        if(self.using_reflectance):
+          self.conv_1x1 = ConvBNPReLU(p["p1"]["output"] * 2 + p["p2"]["output"], p["output_conv"], kernel_size=1)
+        else:
+          self.conv_1x1 = ConvBNPReLU(p["p1"]["output"] + p["p2"]["output"], p["output_conv"], kernel_size=1)
 
         # SCA Block
         self.sac_block = SACBlock(p["output_conv"])
 
     def forward(self, x1, x2, x3):
-      mrciam_x1 = self.mrciam_depth_reflectance(x1)
+      if(self.using_reflectance):
+        mrciam_x1 = self.mrciam_depth_reflectance(x1)
       mrciam_x2 = self.mrciam_depth_reflectance(x2)
       mrciam_x3 =  self.mrciam_xyz(x3)
 
-      concat_out = torch.cat((mrciam_x1, mrciam_x2, mrciam_x3), 1)
+      if(self.using_reflectance):
+        concat_out = torch.cat((mrciam_x1, mrciam_x2, mrciam_x3), 1)
+      else:
+        concat_out = torch.cat((mrciam_x2, mrciam_x3), 1)
 
       conv_out = self.conv_1x1(concat_out)
 
@@ -712,13 +722,13 @@ class SwinTransformer(nn.Module):
 
         x = x.view(-1, Wh, Ww, 8*self.embed_dim).permute(0, 3, 1, 2).contiguous() # Restructuring the output
 
-        x = nn.PixelShuffle(2)(x)  # Increasing spatial resolution
+        x = nn.PixelShuffle(2)(x)[:, :, :, :55]  # Increasing spatial resolution
         x = torch.cat([x, out[3]], dim=1).flatten(2).transpose(1, 2)  # Concatenating and restructuring
         x = self.redduce1(x)  # Reducing dimensionality
         x = torch.clamp(x, min=-65504, max=65504)  # Clipping tensor values
         x = self.norm256(x)  # Normalizing the output
 
-        x, Wh, Ww = self.layers[1](x, 2 * Wh, 2 * Ww)  # Passing through the second layer
+        x, Wh, Ww = self.layers[1](x, 2 * Wh, 2 * Ww -1)  # Passing through the second layer
         x = x.view(-1, Wh, Ww, 4 * self.embed_dim).permute(0, 3, 1, 2).contiguous()  # Restructuring the output
 
         x = nn.PixelShuffle(2)(x)  # Increasing spatial resolution
@@ -776,7 +786,7 @@ class Decoder(nn.Module):
 
     def forward(self, x, outs):
         out = self.bntm(x, outs)
-        out = out.view(-1, 32, 512,  self.embed_dim).permute(0, 3, 1, 2).contiguous()
+        out = out.view(-1, 8, 220,  self.embed_dim).permute(0, 3, 1, 2).contiguous()
         out = self.upsample(out)
         out = self.conv_decoder_block(out, outs[0])
         out = self.seg_head(out)
@@ -791,12 +801,13 @@ class TransVRNet(nn.Module):
                  p_encoder,
                  p_decoder,
                  p_bntm, 
-                 N_CLASSES=20
+                 N_CLASSES=20,
+                 using_reflectance=True
                 ):
         super(TransVRNet, self).__init__()
         self.n_classes = N_CLASSES
         
-        self.mrciam = MRCIAM(p_mrciam)
+        self.mrciam = MRCIAM(p_mrciam, using_reflectance=using_reflectance)
 
         self.encoder_module1 = EncoderModule(p_encoder["module_1"])
         self.encoder_module2 = EncoderModule(p_encoder["module_2"])
@@ -878,9 +889,10 @@ class TransRVNet_loss(nn.Module):
         self.exponent_i = 0.5
         self.class_weights = calculate_class_weights(self.class_frequencies, self.exponent_i)
 
-        self.weighted_cross_entropy_loss = torch.nn.CrossEntropyLoss(reduction='none', weight=self.class_weights)
-        self.softmax = torch.nn.Softmax(dim=1)
-        self.boundary_loss = boundary_loss.BoundaryLoss()
+        # self.weighted_cross_entropy_loss = torch.nn.CrossEntropyLoss(reduction='none', weight=self.class_weights).to(device)
+        self.weighted_cross_entropy_loss = torch.nn.CrossEntropyLoss(reduction='none').to(device)
+        self.softmax = torch.nn.Softmax(dim=1).to(device)
+        self.boundary_loss = boundary_loss.BoundaryLoss().to(device)
 
     def forward(self, output, target, mask):
         # weighted cross entropy loss
@@ -1106,7 +1118,6 @@ class SemanticSegmentationTask(LightningModule):
         xyz = img[:, :3, :, :]
         reflectance = img[:, 3, :, :].unsqueeze(1)
         depth = img[:, 4, :, :].unsqueeze(1)        
-        
         pred = self.model(reflectance, depth, xyz)
         
         # Apply dropout
