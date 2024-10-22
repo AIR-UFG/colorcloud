@@ -19,11 +19,12 @@ from torchvision.transforms import v2
 # %% ../nbs/00_behley2019iccv.ipynb 4
 class SemanticKITTIDataset(Dataset):
     "Load the SemanticKITTI data in a pytorch Dataset object."
-    def __init__(self, data_path, split='train', transform=None):
+    def __init__(self, data_path, split='train', transform=None, ufg_dataset=False):
         data_path = Path(data_path)
         yaml_path = data_path/'semantic-kitti.yaml'
         self.velodyne_path = data_path/'data_odometry_velodyne/dataset/sequences'
         self.labels_path = data_path/'data_odometry_labels/dataset/sequences'
+        self.ufg_dataset = ufg_dataset
 
         with open(yaml_path, 'r') as file:
             metadata = yaml.safe_load(file)
@@ -32,7 +33,8 @@ class SemanticKITTIDataset(Dataset):
         velodyne_fns = []
         for seq in sequences:
             velodyne_fns += list(self.velodyne_path.rglob(f'*{seq:02}/velodyne/*.bin'))
-        
+             
+        velodyne_fns = sorted(velodyne_fns)
         self.frame_ids = [fn.stem for fn in velodyne_fns]
         self.frame_sequences = [fn.parts[-3] for fn in velodyne_fns]
         
@@ -105,6 +107,15 @@ class SemanticKITTIDataset(Dataset):
                 label = label & 0xFFFF
             label = self.learning_map_np[label]
             mask = label != 0   # see the field *learning_ignore* in the yaml file
+
+        if self.ufg_dataset:
+            # removing nans
+            nan_mask = ~np.isnan(frame).any(axis=1)
+            frame = frame[nan_mask]
+            label = label[nan_mask]
+            mask = mask[nan_mask]
+            # normalizing reflectance to be between 0 and 1
+            frame[:,3] = frame[:,3]/255
         
         item = {
             'frame': frame,
@@ -268,10 +279,11 @@ class ProjectionTransform(nn.Module):
 # %% ../nbs/00_behley2019iccv.ipynb 28
 class ProjectionVizTransform(nn.Module):
     "Pytorch transform to preprocess projection images for proper visualization."
-    def __init__(self, color_map_rgb_np, learning_map_inv_np):
+    def __init__(self, color_map_rgb_np, learning_map_inv_np, scaling_values):
         super().__init__()
         self.color_map_rgb_np = color_map_rgb_np
         self.learning_map_inv_np = learning_map_inv_np
+        self.scaling_values = scaling_values
     
     def scale(self, img, min_value, max_value):
         assert img.max() <= max_value
@@ -288,11 +300,11 @@ class ProjectionVizTransform(nn.Module):
         
         normalized_frame_img = None
         if frame_img is not None:
-            x = self.scale(frame_img[:,:,0], -100., 100.)
-            y = self.scale(frame_img[:,:,1], -100., 100.)
-            z = self.scale(frame_img[:,:,2], -31., 5.)
-            r = self.scale(frame_img[:,:,3], 0., 1.)
-            d = self.scale(frame_img[:,:,4], 0., 100.)
+            x = self.scale(frame_img[:,:,0], self.scaling_values["x"]["min"], self.scaling_values["x"]["max"])
+            y = self.scale(frame_img[:,:,1], self.scaling_values["y"]["min"], self.scaling_values["y"]["max"])
+            z = self.scale(frame_img[:,:,2], self.scaling_values["z"]["min"], self.scaling_values["z"]["max"])
+            r = self.scale(frame_img[:,:,3], self.scaling_values["r"]["min"], self.scaling_values["r"]["max"])
+            d = self.scale(frame_img[:,:,4], self.scaling_values["d"]["min"], self.scaling_values["d"]["max"])
             normalized_frame_img = np.stack((x, y, z, r, d), axis=-1)
             normalized_frame_img[mask_img == False] *= 0
 
