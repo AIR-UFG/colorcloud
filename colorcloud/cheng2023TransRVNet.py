@@ -44,7 +44,7 @@ class ConvBNPReLU(Sequential):
                  stride=1,
                  padding=0,
                  dilation=1
-                ):
+                )->torch.Tensor:  # ()
         super().__init__(OrderedDict([
             (f'conv', nn.Conv2d(in_channels, out_channels, kernel_size, stride, padding, dilation=dilation)),
             (f'bn', nn.BatchNorm2d(out_channels)),
@@ -60,7 +60,7 @@ class SACBlock(nn.Module):
     def __init__(self, 
                  channel:int,   # input channels size
                  groups=32      # number o groups to divide
-                ):
+                )->torch.Tensor:
         super(SACBlock, self).__init__()
         self.groups = groups
         self.avg_pool = nn.AdaptiveAvgPool2d(1)
@@ -117,7 +117,7 @@ class MRCIAMSingleChannel(nn.Module):
     """
     def __init__(self, 
                  parameters:dict # dictonary with the input channels and output channels of each ConvBNPReLU of the Class
-                ):
+                ): #
         super(MRCIAMSingleChannel, self).__init__()
         # Bloco 1
         self.block1_3x3 = ConvBNPReLU(parameters["b1_in"], parameters["b1_out1"], kernel_size=3, padding=1)
@@ -180,37 +180,36 @@ class MRCIAM(nn.Module):
     3 input types, the xyz, reflectance and depth
     """
     def __init__(self,
-                 p,
+                 parameters:dict, # dictonary with the input channels and output channels of each ConvBNPReLU of the Class
                  using_reflectance=True
-                )->torch.Tensor:
+                ):
         super(MRCIAM, self).__init__()
+        self.using_reflectance = using_reflectance
+
         self.mrciam_depth = MRCIAMSingleChannel(parameters["p1"])
         self.mrciam_reflectance = MRCIAMSingleChannel(parameters["p1"])
         self.mrciam_xyz = MRCIAMSingleChannel(parameters["p2"])
 
-        self.using_reflectance = using_reflectance
-
         if(self.using_reflectance):
-          self.conv_1x1 = ConvBNPReLU(p["p1"]["output"] * 2 + p["p2"]["output"], p["output_conv"], kernel_size=1)
+          self.conv_1x1 = ConvBNPReLU(parameters["p1"]["output"] * 2 + parameters["p2"]["output"], parameters["output_conv"], kernel_size=1)
         else:
-          self.conv_1x1 = ConvBNPReLU(p["p1"]["output"] + p["p2"]["output"], p["output_conv"], kernel_size=1)
+          self.conv_1x1 = ConvBNPReLU(parameters["p1"]["output"] + parameters["p2"]["output"], parameters["output_conv"], kernel_size=1)
 
         # SCA Block
         self.sac_block = SACBlock(parameters["output_conv"])
 
-    def forward(self, x1, x2, x3):
+    def forward(self, xyz_tensor, depth_tensor, reflectance_tensor):
+      mrciam_xyz =  self.mrciam_xyz(xyz_tensor)
+      mrciam_depth = self.mrciam_depth(depth_tensor)
       if(self.using_reflectance):
-        mrciam_x1 = self.mrciam_depth_reflectance(x1)
-      mrciam_x2 = self.mrciam_depth_reflectance(x2)
-      mrciam_x3 =  self.mrciam_xyz(x3)
+        mrciam_reflectance = self.mrciam_reflectance(reflectance_tensor)
 
       if(self.using_reflectance):
-        concat_out = torch.cat((mrciam_x1, mrciam_x2, mrciam_x3), 1)
+        concat_out = torch.cat((mrciam_xyz, mrciam_depth, mrciam_reflectance), 1)
       else:
-        concat_out = torch.cat((mrciam_x2, mrciam_x3), 1)
+        concat_out = torch.cat((mrciam_xyz, mrciam_depth), 1)
 
       conv_out = self.conv_1x1(concat_out)
-
       out = self.sac_block(conv_out)
 
       return out
@@ -295,7 +294,7 @@ class EncoderModule(nn.Module):
 
         return x, out
 
-# %% ../nbs/03_cheng2023TransRVNet.ipynb 44
+# %% ../nbs/03_cheng2023TransRVNet.ipynb 45
 class MLP(nn.Module):
     """
     A simple Multilayer perceptron.
@@ -323,29 +322,20 @@ class MLP(nn.Module):
         x = self.drop(x)
         return x
 
-# %% ../nbs/03_cheng2023TransRVNet.ipynb 46
-from ast import Tuple
-
-
+# %% ../nbs/03_cheng2023TransRVNet.ipynb 47
 def window_partition(x:torch.Tensor, # (B, H, W, C)
                      window_size:tuple # window size (h, w)
                     )->torch.Tensor: # (num_windows\*B, window_size, window_size, C)
     """
     do something
     """
-    # print('win: ', window_size)
     B, H, W, C = x.shape
-    # print('H: ', H)
-    # print('W: ', W)
-    # print('here: ', H // window_size[0])
-    # print('here 2: ', W // window_size[1])
     x = x.view(B, H // window_size[0], window_size[0], W // window_size[1], window_size[1], C)
-    # print(x.shape)
     windows = x.permute(0, 1, 3, 2, 4, 5).contiguous().view(-1, window_size[0], window_size[1], C)
     return windows
 
 
-# %% ../nbs/03_cheng2023TransRVNet.ipynb 48
+# %% ../nbs/03_cheng2023TransRVNet.ipynb 49
 def window_reverse(windows:torch.Tensor, # (num_windows*B, window_size, window_size, C)
                    window_size:int,      # Window size
                    H:int,                # Height of image
@@ -359,7 +349,7 @@ def window_reverse(windows:torch.Tensor, # (num_windows*B, window_size, window_s
     x = x.permute(0, 1, 3, 2, 4, 5).contiguous().view(B, H, W, -1)
     return x
 
-# %% ../nbs/03_cheng2023TransRVNet.ipynb 49
+# %% ../nbs/03_cheng2023TransRVNet.ipynb 50
 class WindowAttention(nn.Module):
     """ Window based multi-head self attention (W-MSA) module with relative position bias.
         It supports both of shifted and non-shifted window.
@@ -388,7 +378,6 @@ class WindowAttention(nn.Module):
         # get pair-wise relative position index for each token inside the window
         coords_h = torch.arange(self.window_size[0])
         coords_w = torch.arange(self.window_size[1])
-        # TODO: a linha de baixo da um warning
         coords = torch.stack(torch.meshgrid([coords_h, coords_w], indexing='ij'))  # 2, Wh, Ww
         coords_flatten = torch.flatten(coords, 1)  # 2, Wh\*Ww
         relative_coords = coords_flatten[:, :, None] - coords_flatten[:, None, :]  # 2, Wh\*Ww, Wh\*Ww
@@ -440,7 +429,7 @@ class WindowAttention(nn.Module):
         x = self.proj_drop(x)
         return x
 
-# %% ../nbs/03_cheng2023TransRVNet.ipynb 52
+# %% ../nbs/03_cheng2023TransRVNet.ipynb 53
 class SwinTransformerBlock(nn.Module):
     """ 
     Swin Transformer Block.
@@ -456,7 +445,6 @@ class SwinTransformerBlock(nn.Module):
                  drop:float=0.,                      # Dropout rate.
                  attn_drop:float=0.,                 # Attention dropout rate.
                  drop_path:float=0.,                 # Stochastic depth rate.
-                #  act_layer:nn.Module=nn.GELU,        # Activation layer.
                  norm_layer:nn.Module=nn.LayerNorm   # Normalization layer.
                 ):
         super().__init__()
@@ -545,7 +533,7 @@ class SwinTransformerBlock(nn.Module):
 
         return x
 
-# %% ../nbs/03_cheng2023TransRVNet.ipynb 54
+# %% ../nbs/03_cheng2023TransRVNet.ipynb 55
 class BNTM(nn.Module):
     """
     A basic Swin Transformer layer for one stage.
@@ -632,7 +620,7 @@ class BNTM(nn.Module):
         return x, H, W
 
 
-# %% ../nbs/03_cheng2023TransRVNet.ipynb 55
+# %% ../nbs/03_cheng2023TransRVNet.ipynb 56
 class SwinTransformer(nn.Module):
     """
     """
@@ -720,13 +708,15 @@ class SwinTransformer(nn.Module):
 
         x = x.view(-1, Wh, Ww, 8*self.embed_dim).permute(0, 3, 1, 2).contiguous() # Restructuring the output
 
-        x = nn.PixelShuffle(2)(x)[:, :, :, :55]  # Increasing spatial resolution
+        #x = nn.PixelShuffle(2)(x)[:, :, :, :55]   # Increasing spatial resolution
+        x = nn.PixelShuffle(2)(x)  # Increasing spatial resolution
         x = torch.cat([x, out[3]], dim=1).flatten(2).transpose(1, 2)  # Concatenating and restructuring
         x = self.redduce1(x)  # Reducing dimensionality
         x = torch.clamp(x, min=-65504, max=65504)  # Clipping tensor values
         x = self.norm256(x)  # Normalizing the output
 
-        x, Wh, Ww = self.layers[1](x, 2 * Wh, 2 * Ww -1)  # Passing through the second layer
+        x, Wh, Ww = self.layers[1](x, 2 * Wh, 2 * Ww)  # Passing through the second layer
+        #x, Wh, Ww = self.layers[1](x, 2 * Wh, 2 * Ww -1)  # Passing through the second layer
         x = x.view(-1, Wh, Ww, 4 * self.embed_dim).permute(0, 3, 1, 2).contiguous()  # Restructuring the output
 
         x = nn.PixelShuffle(2)(x)  # Increasing spatial resolution
@@ -745,7 +735,7 @@ class SwinTransformer(nn.Module):
 
         return x
 
-# %% ../nbs/03_cheng2023TransRVNet.ipynb 56
+# %% ../nbs/03_cheng2023TransRVNet.ipynb 57
 class ConvDecoderBlock(nn.Module):
     """
     Convolution-based decoder block for the end of decoder pipeline
@@ -774,7 +764,7 @@ class ConvDecoderBlock(nn.Module):
 
         return out
 
-# %% ../nbs/03_cheng2023TransRVNet.ipynb 60
+# %% ../nbs/03_cheng2023TransRVNet.ipynb 61
 class Decoder(nn.Module):
     """
     Decoder abstraction with all steps of transformers and conv blocks
@@ -789,13 +779,13 @@ class Decoder(nn.Module):
 
     def forward(self, x, outs):
         out = self.bntm(x, outs)
-        out = out.view(-1, 8, 220,  self.embed_dim).permute(0, 3, 1, 2).contiguous()
+        out = out.view(-1, 32, 512,  self.embed_dim).permute(0, 3, 1, 2).contiguous()
         out = self.upsample(out)
         out = self.conv_decoder_block(out, outs[0])
         out = self.seg_head(out)
         return out
 
-# %% ../nbs/03_cheng2023TransRVNet.ipynb 64
+# %% ../nbs/03_cheng2023TransRVNet.ipynb 65
 class TransVRNet(nn.Module):
     """
     """
@@ -832,13 +822,13 @@ class TransVRNet(nn.Module):
 
         return out
 
-# %% ../nbs/03_cheng2023TransRVNet.ipynb 70
+# %% ../nbs/03_cheng2023TransRVNet.ipynb 71
 from . import lovasz_softmax_loss
 
-# %% ../nbs/03_cheng2023TransRVNet.ipynb 73
+# %% ../nbs/03_cheng2023TransRVNet.ipynb 74
 from . import boundary_loss
 
-# %% ../nbs/03_cheng2023TransRVNet.ipynb 75
+# %% ../nbs/03_cheng2023TransRVNet.ipynb 77
 def calculate_frequencies(data_path = '/workspace/data', file_name = 'semantic-kitti.yaml'):
     """
     Uses the ratios in the semantic kitti yaml file to calculate the frequency of each class 
@@ -866,7 +856,7 @@ def calculate_frequencies(data_path = '/workspace/data', file_name = 'semantic-k
 
     return frequencies
 
-# %% ../nbs/03_cheng2023TransRVNet.ipynb 78
+# %% ../nbs/03_cheng2023TransRVNet.ipynb 79
 def calculate_class_weights(frequencies, exponent):
     """
     Uses the class frequencies to calculate the weights.
@@ -876,7 +866,7 @@ def calculate_class_weights(frequencies, exponent):
     class_weights = (median_freq / frequencies) ** exponent
     return torch.tensor(class_weights, dtype=torch.float32)
 
-# %% ../nbs/03_cheng2023TransRVNet.ipynb 81
+# %% ../nbs/03_cheng2023TransRVNet.ipynb 82
 class TransRVNet_loss(nn.Module):
     """
     Calculates the total loss with the weighted combination of the three loss functions.
@@ -913,7 +903,7 @@ class TransRVNet_loss(nn.Module):
         # Return the weighted combination of the three loss functions
         return self.Lwce*wce_loss + self.Lls*lov_loss + self.Lbd*bd_loss
 
-# %% ../nbs/03_cheng2023TransRVNet.ipynb 86
+# %% ../nbs/03_cheng2023TransRVNet.ipynb 87
 class RandomRotationTransform(nn.Module):
     """
     Applies a random rotation around the origin to the z
@@ -946,7 +936,7 @@ class RandomRotationTransform(nn.Module):
 
         return item
 
-# %% ../nbs/03_cheng2023TransRVNet.ipynb 88
+# %% ../nbs/03_cheng2023TransRVNet.ipynb 89
 class RandomDroppingPointsTransform(nn.Module):
     """
     Randomly drops a fraction of points from a point cloud frame and its corresponding labels. 
@@ -967,17 +957,14 @@ class RandomDroppingPointsTransform(nn.Module):
             num_points_to_drop = int(drop_fraction * frame.shape[0])
             
             # Randomly select indices to drop
-            drop_indices = np.random.choice(item["frame"].shape[0], num_points_to_drop, replace=False)
-            
-            # Drop the points and corresponding labels
-            item["frame"] = np.delete(item["frame"], drop_indices, axis=0)
-            item["label"] = np.delete(item["label"], drop_indices, axis=0)
-            item["mask"] = np.delete(item["mask"], drop_indices, axis=0)
-            # item["weight"] = np.delete(item["weight"], drop_indices, axis=0)
-    
-        return item
+            drop_indices = np.random.choice(frame.shape[0], num_points_to_drop, replace=False).astype(int)
+                
+            # Set the selected rows in `frame` to the minimum value (all columns in those rows)
+            frame[drop_indices, :] = 1.0 # Define o valor mínimo em todas as colunas da linha
+ 
+        return frame, label, mask
 
-# %% ../nbs/03_cheng2023TransRVNet.ipynb 90
+# %% ../nbs/03_cheng2023TransRVNet.ipynb 91
 class RandomSingInvertingTransform(nn.Module):
     """
     Mirror transform for the X and Y channels.
@@ -995,7 +982,7 @@ class RandomSingInvertingTransform(nn.Module):
             item["frame"][:, frame_to_invert] = -item["frame"][:, frame_to_invert]
         return item
 
-# %% ../nbs/03_cheng2023TransRVNet.ipynb 93
+# %% ../nbs/03_cheng2023TransRVNet.ipynb 94
 def log_activations(logger, step, model, img):
     "Function that uses a Pytorch forward hook to log properties of activations for debugging purposes."
     def debugging_hook(module, inp, out):            
@@ -1018,7 +1005,7 @@ def log_activations(logger, step, model, img):
         depth = img[:, 4, :, :].unsqueeze(1)     
         model(reflectance, depth, xyz)
 
-# %% ../nbs/03_cheng2023TransRVNet.ipynb 94
+# %% ../nbs/03_cheng2023TransRVNet.ipynb 95
 def log_imgs(pred, label, mask, viz_tfm, logger, stage, step, save_image_locally=True):
     """
     Logs predicted and ground truth images during model training/evaluation, 
@@ -1060,7 +1047,7 @@ def log_imgs(pred, label, mask, viz_tfm, logger, stage, step, save_image_locally
         save_path = f"../../step_images/{stage}examples_step{step}.png"
         img_cmp_pil.save(save_path)
 
-# %% ../nbs/03_cheng2023TransRVNet.ipynb 95
+# %% ../nbs/03_cheng2023TransRVNet.ipynb 96
 class SemanticSegmentationTask(LightningModule):
     "Lightning Module to standardize experiments with semantic segmentation tasks."
     def __init__(self, model, loss_fn, viz_tfm, total_steps, lr=1e-1):
