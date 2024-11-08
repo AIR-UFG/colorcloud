@@ -44,7 +44,7 @@ class ConvBNPReLU(Sequential):
                  stride=1,
                  padding=0,
                  dilation=1
-                )->torch.Tensor:  # ()
+                ):
         super().__init__(OrderedDict([
             (f'conv', nn.Conv2d(in_channels, out_channels, kernel_size, stride, padding, dilation=dilation)),
             (f'bn', nn.BatchNorm2d(out_channels)),
@@ -60,7 +60,7 @@ class SACBlock(nn.Module):
     def __init__(self, 
                  channel:int,   # input channels size
                  groups=32      # number o groups to divide
-                )->torch.Tensor:
+                ):
         super(SACBlock, self).__init__()
         self.groups = groups
         self.avg_pool = nn.AdaptiveAvgPool2d(1)
@@ -639,7 +639,8 @@ class SwinTransformer(nn.Module):
                  patch_norm=True,
                  out_indices=(0, 1, 2, 3),
                  frozen_stages=-1,
-                 use_checkpoint=False):
+                 use_checkpoint=False,
+                 ufg_sim_format=False):
         super().__init__()
 
         self.num_layers = len(depths)
@@ -647,6 +648,7 @@ class SwinTransformer(nn.Module):
         self.patch_norm = patch_norm
         self.out_indices = out_indices
         self.frozen_stages = frozen_stages
+        self.ufg_sim_format = ufg_sim_format
 
         # Setting up progressive dropout rate for residual paths
         dpr = [x.item() for x in torch.linspace(drop_path_rate, 0, sum(depths))]
@@ -708,15 +710,19 @@ class SwinTransformer(nn.Module):
 
         x = x.view(-1, Wh, Ww, 8*self.embed_dim).permute(0, 3, 1, 2).contiguous() # Restructuring the output
 
-        #x = nn.PixelShuffle(2)(x)[:, :, :, :55]   # Increasing spatial resolution
-        x = nn.PixelShuffle(2)(x)  # Increasing spatial resolution
+        if (self.ufg_sim_format):
+            x = nn.PixelShuffle(2)(x)[:, :, :, :55]   # Increasing spatial resolution
+        else:
+            x = nn.PixelShuffle(2)(x)  # Increasing spatial resolution
         x = torch.cat([x, out[3]], dim=1).flatten(2).transpose(1, 2)  # Concatenating and restructuring
         x = self.redduce1(x)  # Reducing dimensionality
         x = torch.clamp(x, min=-65504, max=65504)  # Clipping tensor values
         x = self.norm256(x)  # Normalizing the output
 
-        x, Wh, Ww = self.layers[1](x, 2 * Wh, 2 * Ww)  # Passing through the second layer
-        #x, Wh, Ww = self.layers[1](x, 2 * Wh, 2 * Ww -1)  # Passing through the second layer
+        if (self.ufg_sim_format):
+            x, Wh, Ww = self.layers[1](x, 2 * Wh, 2 * Ww -1)  # Passing through the second layer
+        else:
+            x, Wh, Ww = self.layers[1](x, 2 * Wh, 2 * Ww)  # Passing through the second layer
         x = x.view(-1, Wh, Ww, 4 * self.embed_dim).permute(0, 3, 1, 2).contiguous()  # Restructuring the output
 
         x = nn.PixelShuffle(2)(x)  # Increasing spatial resolution
@@ -769,17 +775,21 @@ class Decoder(nn.Module):
     """
     Decoder abstraction with all steps of transformers and conv blocks
     """
-    def __init__(self, p, p_bntm, N_CLASSES):
+    def __init__(self, p, p_bntm, N_CLASSES, ufg_sim_format=False):
         super(Decoder, self).__init__()
         self.embed_dim = p_bntm["embed_dim"]
-        self.bntm = SwinTransformer(window_size=p_bntm["window_size"], embed_dim=self.embed_dim)
+        self.bntm = SwinTransformer(window_size=p_bntm["window_size"], embed_dim=self.embed_dim, ufg_sim_format=ufg_sim_format)
         self.upsample = nn.PixelShuffle(upscale_factor=2)
         self.conv_decoder_block = ConvDecoderBlock(p)
         self.seg_head = ConvBNPReLU(p["output"], N_CLASSES, kernel_size=1)
+        self.ufg_sim_format = ufg_sim_format
 
     def forward(self, x, outs):
         out = self.bntm(x, outs)
-        out = out.view(-1, 32, 512,  self.embed_dim).permute(0, 3, 1, 2).contiguous()
+        if(self.ufg_sim_format):
+            out = out.view(-1, 8, 220,  self.embed_dim).permute(0, 3, 1, 2).contiguous()
+        else:
+            out = out.view(-1, 32, 512,  self.embed_dim).permute(0, 3, 1, 2).contiguous()
         out = self.upsample(out)
         out = self.conv_decoder_block(out, outs[0])
         out = self.seg_head(out)
@@ -795,7 +805,8 @@ class TransVRNet(nn.Module):
                  p_decoder,
                  p_bntm, 
                  N_CLASSES=20,
-                 using_reflectance=True
+                 using_reflectance=True,
+                 ufg_sim_format=False
                 ):
         super(TransVRNet, self).__init__()
         self.n_classes = N_CLASSES
@@ -805,9 +816,9 @@ class TransVRNet(nn.Module):
         self.encoder_module1 = EncoderModule(p_encoder["module_1"])
         self.encoder_module2 = EncoderModule(p_encoder["module_2"])
 
-        self.decoder = Decoder(p=p_decoder, p_bntm=p_bntm, N_CLASSES=N_CLASSES)
+        self.decoder = Decoder(p=p_decoder, p_bntm=p_bntm, N_CLASSES=N_CLASSES, ufg_sim_format=ufg_sim_format)
 
-    def forward(self, xyz_tensor, depth_tensor, reflectance_tensor):
+    def forward(self, xyz_tensor, depth_tensor, reflectance_tensor=None):
         # MRCIAM
         out_mrciam = self.mrciam(xyz_tensor, depth_tensor, reflectance_tensor)
 
@@ -946,7 +957,7 @@ class RandomDroppingPointsTransform(nn.Module):
         super().__init__()
         self.apply_chance = apply_chance
 
-    def forward(self, frame, label, mask):
+    def forward(self, item):
         # 50% of chance of this transformation being applied
         random_chance = np.random.rand()
         if random_chance < self.apply_chance:
@@ -954,15 +965,15 @@ class RandomDroppingPointsTransform(nn.Module):
             drop_fraction = 0.6 * np.random.rand()
             
             # Determine the number of points to drop
-            num_points_to_drop = int(drop_fraction * frame.shape[0])
+            num_points_to_drop = int(drop_fraction * item['frame'].shape[0])
             
             # Randomly select indices to drop
-            drop_indices = np.random.choice(frame.shape[0], num_points_to_drop, replace=False).astype(int)
+            drop_indices = np.random.choice(item['frame'].shape[0], num_points_to_drop, replace=False).astype(int)
                 
             # Set the selected rows in `frame` to the minimum value (all columns in those rows)
-            frame[drop_indices, :] = 1.0 # Define o valor mínimo em todas as colunas da linha
+            item['frame'][drop_indices, :] = 1.0 # Define o valor mínimo em todas as colunas da linha
  
-        return frame, label, mask
+        return item
 
 # %% ../nbs/03_cheng2023TransRVNet.ipynb 91
 class RandomSingInvertingTransform(nn.Module):
