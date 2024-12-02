@@ -640,6 +640,7 @@ class SwinTransformer(nn.Module):
                  out_indices=(0, 1, 2, 3),
                  frozen_stages=-1,
                  use_checkpoint=False,
+                 ufg_format=False,
                  ufg_sim_format=False):
         super().__init__()
 
@@ -648,6 +649,7 @@ class SwinTransformer(nn.Module):
         self.patch_norm = patch_norm
         self.out_indices = out_indices
         self.frozen_stages = frozen_stages
+        self.ufg_format = ufg_format
         self.ufg_sim_format = ufg_sim_format
 
         # Setting up progressive dropout rate for residual paths
@@ -775,18 +777,21 @@ class Decoder(nn.Module):
     """
     Decoder abstraction with all steps of transformers and conv blocks
     """
-    def __init__(self, p, p_bntm, N_CLASSES, ufg_sim_format=False):
+    def __init__(self, p, p_bntm, N_CLASSES, ufg_format=False, ufg_sim_format=False):
         super(Decoder, self).__init__()
         self.embed_dim = p_bntm["embed_dim"]
-        self.bntm = SwinTransformer(window_size=p_bntm["window_size"], embed_dim=self.embed_dim, ufg_sim_format=ufg_sim_format)
+        self.bntm = SwinTransformer(window_size=p_bntm["window_size"], embed_dim=self.embed_dim, ufg_format=ufg_format, ufg_sim_format=ufg_sim_format)
         self.upsample = nn.PixelShuffle(upscale_factor=2)
         self.conv_decoder_block = ConvDecoderBlock(p)
         self.seg_head = ConvBNPReLU(p["output"], N_CLASSES, kernel_size=1)
+        self.ufg_format = ufg_format
         self.ufg_sim_format = ufg_sim_format
 
     def forward(self, x, outs):
         out = self.bntm(x, outs)
-        if(self.ufg_sim_format):
+        if(self.ufg_format):
+            out = out.view(-1, 8, 512,  self.embed_dim).permute(0, 3, 1, 2).contiguous()
+        elif(self.ufg_sim_format):
             out = out.view(-1, 8, 220,  self.embed_dim).permute(0, 3, 1, 2).contiguous()
         else:
             out = out.view(-1, 32, 512,  self.embed_dim).permute(0, 3, 1, 2).contiguous()
@@ -806,6 +811,7 @@ class TransVRNet(nn.Module):
                  p_bntm, 
                  N_CLASSES=20,
                  using_reflectance=True,
+                 ufg_format=False,
                  ufg_sim_format=False
                 ):
         super(TransVRNet, self).__init__()
@@ -816,7 +822,7 @@ class TransVRNet(nn.Module):
         self.encoder_module1 = EncoderModule(p_encoder["module_1"])
         self.encoder_module2 = EncoderModule(p_encoder["module_2"])
 
-        self.decoder = Decoder(p=p_decoder, p_bntm=p_bntm, N_CLASSES=N_CLASSES, ufg_sim_format=ufg_sim_format)
+        self.decoder = Decoder(p=p_decoder, p_bntm=p_bntm, N_CLASSES=N_CLASSES, ufg_format=ufg_format, ufg_sim_format=ufg_sim_format)
 
     def forward(self, xyz_tensor, depth_tensor, reflectance_tensor=None):
         # MRCIAM
