@@ -122,6 +122,10 @@ class SemanticKITTIDataset(Dataset):
         }
         if self.transform:
             item = self.transform(item)
+            if self.simple_resize:
+                item['frame'] = item['frame'].repeat_interleave(4, dim=1)
+                item['label'] = item['label'].repeat_interleave(4, dim=0)
+                item['mask'] = item['mask'].repeat_interleave(4, dim=0)
         
         return item
 
