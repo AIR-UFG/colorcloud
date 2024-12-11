@@ -17,12 +17,13 @@ from torchvision.transforms import v2
 # %% ../nbs/00_behley2019iccv.ipynb 4
 class SemanticKITTIDataset(Dataset):
     "Load the SemanticKITTI data in a pytorch Dataset object."
-    def __init__(self, data_path, split='train', transform=None, ufg_dataset=False):
+    def __init__(self, data_path, split='train', transform=None, ufg_dataset=False, simple_resize=False):
         data_path = Path(data_path)
         yaml_path = data_path/'semantic-kitti.yaml'
         self.velodyne_path = data_path/'data_odometry_velodyne/dataset/sequences'
         self.labels_path = data_path/'data_odometry_labels/dataset/sequences'
         self.ufg_dataset = ufg_dataset
+        self.simple_resize = simple_resize
 
         with open(yaml_path, 'r') as file:
             metadata = yaml.safe_load(file)
