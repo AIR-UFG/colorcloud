@@ -888,7 +888,7 @@ class TransRVNet_loss(nn.Module):
     """
     Calculates the total loss with the weighted combination of the three loss functions.
     """
-    def __init__(self, device, file_name_yaml=None):
+    def __init__(self, device, file_name_yaml='semantic-kitti.yaml'):
         super().__init__()
         # The weight of each loss
         self.Lwce = 1.0
@@ -1020,7 +1020,7 @@ def log_activations(logger, step, model, img):
         xyz = img[:, :3, :, :]
         reflectance = img[:, 3, :, :].unsqueeze(1)
         depth = img[:, 4, :, :].unsqueeze(1)     
-        model(reflectance, depth, xyz)
+        model(xyz, depth, reflectance)
 
 # %% ../nbs/03_cheng2023TransRVNet.ipynb 95
 def log_imgs(pred, label, mask, viz_tfm, logger, stage, step, save_image_locally=True):
@@ -1119,13 +1119,13 @@ class SemanticSegmentationTask(LightningModule):
             log_imgs(pred, label, mask, self.viz_tfm, logger, stage, self.step_idx)
     
     def step(self, batch, batch_idx, stage, metric):
-        img, label, mask, weight = batch["frame"], batch["label"], batch["mask"], batch["weight"]
+        img, label, mask = batch["frame"], batch["label"], batch["mask"]
 
         # Separate channels
         xyz = img[:, :3, :, :]
         reflectance = img[:, 3, :, :].unsqueeze(1)
         depth = img[:, 4, :, :].unsqueeze(1)        
-        pred = self.model(reflectance, depth, xyz)
+        pred = self.model(xyz, depth, reflectance)
         
         # Apply dropout
         pred = self.dropout(pred)

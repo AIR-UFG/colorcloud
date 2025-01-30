@@ -351,6 +351,13 @@ class ProjectionToTensorTransform(nn.Module):
 class SemanticSegmentationLDM(LightningDataModule):
     "Lightning DataModule to facilitate reproducibility of experiments."
     def __init__(self, 
+                 scaling_values={  
+                                    "x" : {"min": -150., "max":150.},
+                                    "y" : {"min": -150., "max":150.},
+                                    "z" : {"min": -10., "max":30.},
+                                    "r" : {"min": 0., "max":1.},
+                                    "d" : {"min": 0., "max":130.}
+                                },
                  proj_style='unfold',
                  proj_kargs={'W': 512, 'H': 64},
                  remapping_rules=None,
@@ -372,6 +379,7 @@ class SemanticSegmentationLDM(LightningDataModule):
         self.eval_batch_size = eval_batch_size
         self.num_workers = num_workers
         self.aug_tfms = aug_tfms
+        self.scaling_values = scaling_values
     
     def setup(self, stage: str):
         data_path = '/workspace/data'
@@ -388,7 +396,7 @@ class SemanticSegmentationLDM(LightningDataModule):
         if self.remapping_rules:
             ds.learning_remap(self.remapping_rules)
         if not hasattr(self, 'viz_tfm'):
-            self.viz_tfm = ProjectionVizTransform(ds.color_map_rgb_np, ds.learning_map_inv_np)
+            self.viz_tfm = ProjectionVizTransform(ds.color_map_rgb_np, ds.learning_map_inv_np, scaling_values=self.scaling_values)
         
         if stage == 'fit':
             if self.aug_tfms:
