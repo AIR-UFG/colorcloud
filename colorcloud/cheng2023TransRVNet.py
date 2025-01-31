@@ -1061,7 +1061,7 @@ def log_imgs(pred, label, mask, viz_tfm, logger, stage, step, save_image_locally
     if save_image_locally:
         img_cmp = img_cmp.astype(np.uint8)
         img_cmp_pil = Image.fromarray(img_cmp)
-        save_path = f"../../step_images/{stage}examples_step{step}.png"
+        save_path = f"../../data/imagens/transRVNet/{stage}examples_step{step}.png"
         img_cmp_pil.save(save_path)
 
 # %% ../nbs/03_cheng2023TransRVNet.ipynb 96
@@ -1115,7 +1115,7 @@ class SemanticSegmentationTask(LightningModule):
         logger = self.logger.experiment
         
         _, pred, label, mask = self.step(batch, batch_idx, stage, self.val_accuracy)
-        if batch_idx == 0:
+        if batch_idx == 0 and logger:
             log_imgs(pred, label, mask, self.viz_tfm, logger, stage, self.step_idx)
     
     def step(self, batch, batch_idx, stage, metric):
