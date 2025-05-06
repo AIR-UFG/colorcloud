@@ -274,10 +274,11 @@ class ProjectionTransform(nn.Module):
 # %% ../nbs/00_behley2019iccv.ipynb 28
 class ProjectionVizTransform(nn.Module):
     "Pytorch transform to preprocess projection images for proper visualization."
-    def __init__(self, color_map_rgb_np, learning_map_inv_np):
+    def __init__(self, color_map_rgb_np, learning_map_inv_np, scaling_values):
         super().__init__()
         self.color_map_rgb_np = color_map_rgb_np
         self.learning_map_inv_np = learning_map_inv_np
+        self.scaling_values = scaling_values
     
     def scale(self, img, min_value, max_value):
         assert img.max() <= max_value
@@ -294,11 +295,11 @@ class ProjectionVizTransform(nn.Module):
         
         normalized_frame_img = None
         if frame_img is not None:
-            x = self.scale(frame_img[:,:,0], -100., 100.)
-            y = self.scale(frame_img[:,:,1], -100., 100.)
-            z = self.scale(frame_img[:,:,2], -31., 5.)
-            r = self.scale(frame_img[:,:,3], 0., 1.)
-            d = self.scale(frame_img[:,:,4], 0., 100.)
+            x = self.scale(frame_img[:,:,0], self.scaling_values["x"]["min"], self.scaling_values["x"]["max"])
+            y = self.scale(frame_img[:,:,1], self.scaling_values["y"]["min"], self.scaling_values["y"]["max"])
+            z = self.scale(frame_img[:,:,2], self.scaling_values["z"]["min"], self.scaling_values["z"]["max"])
+            r = self.scale(frame_img[:,:,3], self.scaling_values["r"]["min"], self.scaling_values["r"]["max"])
+            d = self.scale(frame_img[:,:,4], self.scaling_values["d"]["min"], self.scaling_values["d"]["max"])
             normalized_frame_img = np.stack((x, y, z, r, d), axis=-1)
             normalized_frame_img[mask_img == False] *= 0
 
