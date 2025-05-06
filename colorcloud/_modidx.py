@@ -130,12 +130,4 @@ d = { 'settings': { 'branch': 'main',
                                                'colorcloud.chen2020mvlidarnet.MVLidarNet.__init__': ( 'chen2020mvlidarnet.html#mvlidarnet.__init__',
                                                                                                       'colorcloud/chen2020mvlidarnet.py'),
                                                'colorcloud.chen2020mvlidarnet.MVLidarNet.forward': ( 'chen2020mvlidarnet.html#mvlidarnet.forward',
-                                                                                                     'colorcloud/chen2020mvlidarnet.py')},
-            'colorcloud.ml_tools': { 'colorcloud.ml_tools.CustomMB': ('ml_tools.html#custommb', 'colorcloud/ml_tools.py'),
-                                     'colorcloud.ml_tools.CustomMB.update_graph': ( 'ml_tools.html#custommb.update_graph',
-                                                                                    'colorcloud/ml_tools.py'),
-                                     'colorcloud.ml_tools.Trainer': ('ml_tools.html#trainer', 'colorcloud/ml_tools.py'),
-                                     'colorcloud.ml_tools.Trainer.__init__': ('ml_tools.html#trainer.__init__', 'colorcloud/ml_tools.py'),
-                                     'colorcloud.ml_tools.Trainer.fit': ('ml_tools.html#trainer.fit', 'colorcloud/ml_tools.py'),
-                                     'colorcloud.ml_tools.Trainer.run_epoch': ( 'ml_tools.html#trainer.run_epoch',
-                                                                                'colorcloud/ml_tools.py')}}}
+                                                                                                     'colorcloud/chen2020mvlidarnet.py')}}}
