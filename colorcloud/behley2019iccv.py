@@ -4,7 +4,7 @@
 
 # %% auto 0
 __all__ = ['SemanticKITTIDataset', 'SphericalProjection', 'UnfoldingProjection', 'ProjectionTransform', 'ProjectionVizTransform',
-           'ProjectionToTensorTransform', 'get_benchmarking_dls']
+           'plot_projections', 'ProjectionToTensorTransform', 'get_benchmarking_dls']
 
 # %% ../nbs/00_behley2019iccv.ipynb 2
 import torch
@@ -14,6 +14,7 @@ import yaml
 from pathlib import Path
 import numpy as np
 from torchvision.transforms import v2
+from matplotlib import pyplot as plt
 
 # %% ../nbs/00_behley2019iccv.ipynb 4
 class SemanticKITTIDataset(Dataset):
@@ -195,7 +196,7 @@ class UnfoldingProjection:
         
         return proj_x, proj_y, None
 
-# %% ../nbs/00_behley2019iccv.ipynb 21
+# %% ../nbs/00_behley2019iccv.ipynb 20
 class ProjectionTransform(nn.Module):
     "Pytorch transform that turns a point cloud frame and its respective label and mask arrays into images in given projection style."
     def __init__(self, projection):
@@ -271,7 +272,7 @@ class ProjectionTransform(nn.Module):
         }
         return item
 
-# %% ../nbs/00_behley2019iccv.ipynb 28
+# %% ../nbs/00_behley2019iccv.ipynb 27
 class ProjectionVizTransform(nn.Module):
     "Pytorch transform to preprocess projection images for proper visualization."
     def __init__(self, color_map_rgb_np, learning_map_inv_np, scaling_values):
@@ -317,7 +318,20 @@ class ProjectionVizTransform(nn.Module):
         }
         return item
 
-# %% ../nbs/00_behley2019iccv.ipynb 35
+# %% ../nbs/00_behley2019iccv.ipynb 29
+def plot_projections(img, label, channels_names):
+    assert len(channels_names) == img.shape[-1]
+    channels = [img[:,:,i] for i in range(len(channels_names))]
+    if label is not None:
+        channels_names.append('label')
+        channels.append(label)
+    fig, axs = plt.subplots(len(channels_names), 1, figsize=(20,10), layout='compressed')
+    for ax, channel, title in zip(axs, channels, channels_names):
+        ax.imshow(channel)
+        ax.set_title(title)
+        ax.axis('off')
+
+# %% ../nbs/00_behley2019iccv.ipynb 34
 class ProjectionToTensorTransform(nn.Module):
     "Pytorch transform that converts the projections from np.array to torch.tensor. It also changes the frame image format from (H, W, C) to (C, H, W)."
     def forward(self, item):
@@ -339,7 +353,7 @@ class ProjectionToTensorTransform(nn.Module):
         }
         return item
 
-# %% ../nbs/00_behley2019iccv.ipynb 52
+# %% ../nbs/00_behley2019iccv.ipynb 51
 def get_benchmarking_dls(
     data_path,
     proj_style='unfold',
