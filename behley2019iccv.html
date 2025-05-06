@@ -1,0 +1,1766 @@
+<!DOCTYPE html>
+<html xmlns="http://www.w3.org/1999/xhtml" lang="en" xml:lang="en"><head>
+
+<meta charset="utf-8">
+<meta name="generator" content="quarto-1.7.30">
+
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
+
+<meta name="description" content="Module to handle loading, preprocessing and postprocessing of the data from SemanticKITTI: A Dataset for Semantic Scene Understanding of LiDAR Sequences.">
+
+<title>behley2019iccv – colorcloud</title>
+<style>
+code{white-space: pre-wrap;}
+span.smallcaps{font-variant: small-caps;}
+div.columns{display: flex; gap: min(4vw, 1.5em);}
+div.column{flex: auto; overflow-x: auto;}
+div.hanging-indent{margin-left: 1.5em; text-indent: -1.5em;}
+ul.task-list{list-style: none;}
+ul.task-list li input[type="checkbox"] {
+  width: 0.8em;
+  margin: 0 0.8em 0.2em -1em; /* quarto-specific, see https://github.com/quarto-dev/quarto-cli/issues/4556 */ 
+  vertical-align: middle;
+}
+/* CSS for syntax highlighting */
+html { -webkit-text-size-adjust: 100%; }
+pre > code.sourceCode { white-space: pre; position: relative; }
+pre > code.sourceCode > span { display: inline-block; line-height: 1.25; }
+pre > code.sourceCode > span:empty { height: 1.2em; }
+.sourceCode { overflow: visible; }
+code.sourceCode > span { color: inherit; text-decoration: inherit; }
+div.sourceCode { margin: 1em 0; }
+pre.sourceCode { margin: 0; }
+@media screen {
+div.sourceCode { overflow: auto; }
+}
+@media print {
+pre > code.sourceCode { white-space: pre-wrap; }
+pre > code.sourceCode > span { text-indent: -5em; padding-left: 5em; }
+}
+pre.numberSource code
+  { counter-reset: source-line 0; }
+pre.numberSource code > span
+  { position: relative; left: -4em; counter-increment: source-line; }
+pre.numberSource code > span > a:first-child::before
+  { content: counter(source-line);
+    position: relative; left: -1em; text-align: right; vertical-align: baseline;
+    border: none; display: inline-block;
+    -webkit-touch-callout: none; -webkit-user-select: none;
+    -khtml-user-select: none; -moz-user-select: none;
+    -ms-user-select: none; user-select: none;
+    padding: 0 4px; width: 4em;
+  }
+pre.numberSource { margin-left: 3em;  padding-left: 4px; }
+div.sourceCode
+  {   }
+@media screen {
+pre > code.sourceCode > span > a:first-child::before { text-decoration: underline; }
+}
+</style>
+
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jquery/3.5.1/jquery.min.js" integrity="sha512-bLT0Qm9VnAYZDflyKcBaQ2gg0hSYNQrJ8RilYldYQ1FxQYoCLtUjuuRuZo+fjqhx/qtq/1itJ0C2ejDxltZVFg==" crossorigin="anonymous"></script><script src="site_libs/quarto-nav/quarto-nav.js"></script>
+<script src="site_libs/quarto-nav/headroom.min.js"></script>
+<script src="site_libs/clipboard/clipboard.min.js"></script>
+<script src="site_libs/quarto-search/autocomplete.umd.js"></script>
+<script src="site_libs/quarto-search/fuse.min.js"></script>
+<script src="site_libs/quarto-search/quarto-search.js"></script>
+<meta name="quarto:offset" content="./">
+<script src="site_libs/quarto-html/quarto.js" type="module"></script>
+<script src="site_libs/quarto-html/tabsets/tabsets.js" type="module"></script>
+<script src="site_libs/quarto-html/popper.min.js"></script>
+<script src="site_libs/quarto-html/tippy.umd.min.js"></script>
+<script src="site_libs/quarto-html/anchor.min.js"></script>
+<link href="site_libs/quarto-html/tippy.css" rel="stylesheet">
+<link href="site_libs/quarto-html/quarto-syntax-highlighting-de070a7b0ab54f8780927367ac907214.css" rel="stylesheet" id="quarto-text-highlighting-styles">
+<script src="site_libs/bootstrap/bootstrap.min.js"></script>
+<link href="site_libs/bootstrap/bootstrap-icons.css" rel="stylesheet">
+<link href="site_libs/bootstrap/bootstrap-c4832a576a2b2751674216aa53ffbffd.min.css" rel="stylesheet" append-hash="true" id="quarto-bootstrap" data-mode="light">
+<script id="quarto-search-options" type="application/json">{
+  "location": "navbar",
+  "copy-button": false,
+  "collapse-after": 3,
+  "panel-placement": "end",
+  "type": "overlay",
+  "limit": 50,
+  "keyboard-shortcut": [
+    "f",
+    "/",
+    "s"
+  ],
+  "show-item-context": false,
+  "language": {
+    "search-no-results-text": "No results",
+    "search-matching-documents-text": "matching documents",
+    "search-copy-link-title": "Copy link to search",
+    "search-hide-matches-text": "Hide additional matches",
+    "search-more-match-text": "more match in this document",
+    "search-more-matches-text": "more matches in this document",
+    "search-clear-button-title": "Clear",
+    "search-text-placeholder": "",
+    "search-detached-cancel-button-title": "Cancel",
+    "search-submit-button-title": "Submit",
+    "search-label": "Search"
+  }
+}</script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/require.js/2.3.6/require.min.js" integrity="sha512-c3Nl8+7g4LMSTdrm621y7kf9v3SDPnhxLNhcjFJbKECVnmZHTdo+IRO05sNLTH/D3vA6u1X32ehoLC7WFVdheg==" crossorigin="anonymous"></script>
+
+<script type="application/javascript">define('jquery', [],function() {return window.jQuery;})</script>
+<script src="https://unpkg.com/@jupyter-widgets/html-manager@*/dist/embed-amd.js" crossorigin="anonymous"></script>
+
+  <script src="https://cdnjs.cloudflare.com/polyfill/v3/polyfill.min.js?features=es6"></script>
+  <script src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-chtml-full.js" type="text/javascript"></script>
+
+<script type="text/javascript">
+const typesetMath = (el) => {
+  if (window.MathJax) {
+    // MathJax Typeset
+    window.MathJax.typeset([el]);
+  } else if (window.katex) {
+    // KaTeX Render
+    var mathElements = el.getElementsByClassName("math");
+    var macros = [];
+    for (var i = 0; i < mathElements.length; i++) {
+      var texText = mathElements[i].firstChild;
+      if (mathElements[i].tagName == "SPAN") {
+        window.katex.render(texText.data, mathElements[i], {
+          displayMode: mathElements[i].classList.contains('display'),
+          throwOnError: false,
+          macros: macros,
+          fleqn: false
+        });
+      }
+    }
+  }
+}
+window.Quarto = {
+  typesetMath
+};
+</script>
+
+<link rel="stylesheet" href="styles.css">
+<meta property="og:title" content="behley2019iccv – colorcloud">
+<meta property="og:description" content="Module to handle loading, preprocessing and postprocessing of the data from SemanticKITTI: A Dataset for Semantic Scene Understanding of LiDAR Sequences.">
+<meta property="og:image" content="https://AIR-UFG.github.io/colorcloud/00_behley2019iccv_files/figure-html/cell-12-output-1.png">
+<meta property="og:site_name" content="colorcloud">
+<meta property="og:image:height" content="413">
+<meta property="og:image:width" content="568">
+<meta name="twitter:title" content="behley2019iccv – colorcloud">
+<meta name="twitter:description" content="Module to handle loading, preprocessing and postprocessing of the data from SemanticKITTI: A Dataset for Semantic Scene Understanding of LiDAR Sequences.">
+<meta name="twitter:image" content="https://AIR-UFG.github.io/colorcloud/00_behley2019iccv_files/figure-html/cell-12-output-1.png">
+<meta name="twitter:image-height" content="413">
+<meta name="twitter:image-width" content="568">
+<meta name="twitter:card" content="summary_large_image">
+</head>
+
+<body class="nav-sidebar floating nav-fixed quarto-light">
+
+<div id="quarto-search-results"></div>
+  <header id="quarto-header" class="headroom fixed-top">
+    <nav class="navbar navbar-expand-lg " data-bs-theme="dark">
+      <div class="navbar-container container-fluid">
+      <div class="navbar-brand-container mx-auto">
+    <a class="navbar-brand" href="./index.html">
+    <span class="navbar-title">colorcloud</span>
+    </a>
+  </div>
+        <div class="quarto-navbar-tools tools-end">
+</div>
+          <div id="quarto-search" class="" title="Search"></div>
+      </div> <!-- /container-fluid -->
+    </nav>
+  <nav class="quarto-secondary-nav">
+    <div class="container-fluid d-flex">
+      <button type="button" class="quarto-btn-toggle btn" data-bs-toggle="collapse" role="button" data-bs-target=".quarto-sidebar-collapse-item" aria-controls="quarto-sidebar" aria-expanded="false" aria-label="Toggle sidebar navigation" onclick="if (window.quartoToggleHeadroom) { window.quartoToggleHeadroom(); }">
+        <i class="bi bi-layout-text-sidebar-reverse"></i>
+      </button>
+        <nav class="quarto-page-breadcrumbs" aria-label="breadcrumb"><ol class="breadcrumb"><li class="breadcrumb-item"><a href="./behley2019iccv.html">behley2019iccv</a></li></ol></nav>
+        <a class="flex-grow-1" role="navigation" data-bs-toggle="collapse" data-bs-target=".quarto-sidebar-collapse-item" aria-controls="quarto-sidebar" aria-expanded="false" aria-label="Toggle sidebar navigation" onclick="if (window.quartoToggleHeadroom) { window.quartoToggleHeadroom(); }">      
+        </a>
+    </div>
+  </nav>
+</header>
+<!-- content -->
+<div id="quarto-content" class="quarto-container page-columns page-rows-contents page-layout-article page-navbar">
+<!-- sidebar -->
+  <nav id="quarto-sidebar" class="sidebar collapse collapse-horizontal quarto-sidebar-collapse-item sidebar-navigation floating overflow-auto">
+    <div class="sidebar-menu-container"> 
+    <ul class="list-unstyled mt-1">
+        <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="./index.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">colorcloud</span></a>
+  </div>
+</li>
+        <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="./behley2019iccv.html" class="sidebar-item-text sidebar-link active">
+ <span class="menu-text">behley2019iccv</span></a>
+  </div>
+</li>
+        <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="./biasutti2019riu.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">biasutti2019riu</span></a>
+  </div>
+</li>
+        <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="./chen2020mvlidarnet.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">chen2020mvlidarnet</span></a>
+  </div>
+</li>
+    </ul>
+    </div>
+</nav>
+<div id="quarto-sidebar-glass" class="quarto-sidebar-collapse-item" data-bs-toggle="collapse" data-bs-target=".quarto-sidebar-collapse-item"></div>
+<!-- margin-sidebar -->
+    <div id="quarto-margin-sidebar" class="sidebar margin-sidebar">
+        <nav id="TOC" role="doc-toc" class="toc-active">
+    <h2 id="toc-title">On this page</h2>
+   
+  <ul>
+  <li><a href="#semantic-kitti-api" id="toc-semantic-kitti-api" class="nav-link active" data-scroll-target="#semantic-kitti-api">semantic-kitti-api</a>
+  <ul class="collapse">
+  <li><a href="#introduction" id="toc-introduction" class="nav-link" data-scroll-target="#introduction">1. Introduction</a></li>
+  <li><a href="#semantickittidataset" id="toc-semantickittidataset" class="nav-link" data-scroll-target="#semantickittidataset">SemanticKITTIDataset</a></li>
+  </ul></li>
+  <li><a href="#lidar-range-image-projections" id="toc-lidar-range-image-projections" class="nav-link" data-scroll-target="#lidar-range-image-projections">LiDAR Range Image Projections</a>
+  <ul class="collapse">
+  <li><a href="#sphericalprojection" id="toc-sphericalprojection" class="nav-link" data-scroll-target="#sphericalprojection">SphericalProjection</a></li>
+  <li><a href="#unfoldingprojection" id="toc-unfoldingprojection" class="nav-link" data-scroll-target="#unfoldingprojection">UnfoldingProjection</a></li>
+  <li><a href="#projectiontransform" id="toc-projectiontransform" class="nav-link" data-scroll-target="#projectiontransform">ProjectionTransform</a></li>
+  <li><a href="#projectionviztransform" id="toc-projectionviztransform" class="nav-link" data-scroll-target="#projectionviztransform">ProjectionVizTransform</a></li>
+  <li><a href="#plot_projections" id="toc-plot_projections" class="nav-link" data-scroll-target="#plot_projections">plot_projections</a></li>
+  <li><a href="#projectiontotensortransform" id="toc-projectiontotensortransform" class="nav-link" data-scroll-target="#projectiontotensortransform">ProjectionToTensorTransform</a></li>
+  </ul></li>
+  <li><a href="#remapping-the-labels" id="toc-remapping-the-labels" class="nav-link" data-scroll-target="#remapping-the-labels">Remapping the labels</a></li>
+  <li><a href="#exploratory-data-analysis-eda" id="toc-exploratory-data-analysis-eda" class="nav-link" data-scroll-target="#exploratory-data-analysis-eda">Exploratory Data Analysis (EDA)</a></li>
+  <li><a href="#dataloaders-for-benchmarking" id="toc-dataloaders-for-benchmarking" class="nav-link" data-scroll-target="#dataloaders-for-benchmarking">DataLoaders for benchmarking</a>
+  <ul class="collapse">
+  <li><a href="#get_benchmarking_dls" id="toc-get_benchmarking_dls" class="nav-link" data-scroll-target="#get_benchmarking_dls">get_benchmarking_dls</a></li>
+  </ul></li>
+  </ul>
+<div class="toc-actions"><ul><li><a href="https://github.com/AIR-UFG/colorcloud/issues/new" class="toc-action"><i class="bi bi-github"></i>Report an issue</a></li></ul></div></nav>
+    </div>
+<!-- main -->
+<main class="content" id="quarto-document-content">
+
+<header id="title-block-header" class="quarto-title-block default">
+<div class="quarto-title">
+<h1 class="title">behley2019iccv</h1>
+</div>
+
+<div>
+  <div class="description">
+    Module to handle loading, preprocessing and postprocessing of the data from <a href="https://arxiv.org/pdf/1904.01416">SemanticKITTI: A Dataset for Semantic Scene Understanding of LiDAR Sequences</a>.
+  </div>
+</div>
+
+
+<div class="quarto-title-meta">
+
+    
+  
+    
+  </div>
+  
+
+
+</header>
+
+
+<!-- WARNING: THIS FILE WAS AUTOGENERATED! DO NOT EDIT! -->
+<section id="semantic-kitti-api" class="level2">
+<h2 class="anchored" data-anchor-id="semantic-kitti-api"><a href="https://github.com/PRBonn/semantic-kitti-api">semantic-kitti-api</a></h2>
+<p>This is an adaptation of the code from the semantic-kitti-api as a pytorch <a href="https://pytorch.org/tutorials/beginner/basics/data_tutorial.html">Dataset</a>.</p>
+<p>Summarizing quotes from the paper:</p>
+<section id="introduction" class="level3">
+<h3 class="anchored" data-anchor-id="introduction">1. Introduction</h3>
+<blockquote class="blockquote">
+<ul>
+<li>“we annotated all 22 sequences of the odometry benchmark of the <a href="https://www.cvlibs.net/publications/Geiger2012CVPR.pdf">KITTI Vision Benchmark</a> consisting of over 43 000 scans” ### 3. The SemanticKITTI Dataset</li>
+<li>“showing inner city traffic, residential areas, but also highway scenes and countryside roads around Karlsruhe, Germany”</li>
+<li>“splitting sequences <strong>00 to 10 as training set</strong>, and <strong>11 to 21 as test set</strong>. For consistency […], we adopt the same division for our training and test set [as the <a href="https://www.cvlibs.net/publications/Geiger2012CVPR.pdf">KITTI Vision Benchmark</a>]”</li>
+<li>“we provide <strong>23201</strong> full 3D scans for training and <strong>20351</strong> for testing”</li>
+<li>“we <strong>do not</strong> distinguish between persons riding a vehicle and the vehicle, but label the vehicle and the person as either bicyclist or motorcyclist”</li>
+<li>“we have <strong>28 classes</strong>, where <strong>6 classes</strong> are assigned the attribute <strong>moving or non-moving</strong>, and <strong>one outlier class</strong> is included for erroneous laser measurements caused by reflections or other effects” #### 3.1 Labeling process</li>
+<li>“we first register and loop close the sequences using an off-the-shelf laser-based SLAM system”</li>
+<li>“For three sequences, we had to <strong>manually</strong> add loop closure constraints to get correctly loop closed trajectories”</li>
+<li>“We subdivide the sequence of point clouds into tiles of <strong>100 m by 100 m</strong> […] This enables us to label all scans consistently even when we encounter temporally distant loop closures”</li>
+<li>“An annotator needs on average <strong>4.5 hours per tile</strong>, when labeling <strong>residential areas</strong> […], and needs on average <strong>1.5 hours</strong> for labeling a <strong>highway</strong> tile.”</li>
+<li>“the whole dataset comprises <strong>518 tiles</strong>” ### 4. Evaluation of Semantic Segmentation #### 4.1 Single Scan Experiments</li>
+<li>“we use <strong>25</strong> instead of 28 classes, <strong>ignoring</strong> <em>outlier</em>, <em>other-structure</em>, and <em>other-object</em> during training and inference”</li>
+<li>“we <strong>cannot</strong> expect to distinguish <em>moving</em> from <em>non-moving</em> objects with a <strong>single scan</strong> […] We therefore combine the moving classes with the corresponding non-moving class resulting in a total number of <strong>19 classes</strong> for training and evaluation”</li>
+<li>“In the case of a rotating LiDAR, all points of a single turn can be projected to an image by using a <strong>spherical projection</strong>”</li>
+<li>“classes with <strong>few examples</strong>, like <em>motorcyclists</em> and <em>trucks</em>, seem to be more difficult”</li>
+<li>“classes with only a small number of points in a single point cloud, like <em>bicycles</em> and <em>poles</em>, are <strong>hard classes</strong>”</li>
+</ul>
+</blockquote>
+<hr>
+<p><a href="https://github.com/AIR-UFG/colorcloud/blob/main/colorcloud/behley2019iccv.py#L20" target="_blank" style="float:right; font-size:smaller">source</a></p>
+</section>
+<section id="semantickittidataset" class="level3">
+<h3 class="anchored" data-anchor-id="semantickittidataset">SemanticKITTIDataset</h3>
+<blockquote class="blockquote">
+<pre><code> SemanticKITTIDataset (data_path, split='train', transform=None,
+                       remapping_rules=None)</code></pre>
+</blockquote>
+<p><em>Load the SemanticKITTI data in a pytorch Dataset object.</em></p>
+<div id="cell-4" class="cell">
+<details open="" class="code-fold">
+<summary>Exported source</summary>
+<div class="sourceCode cell-code" id="cb2"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb2-1"><a href="#cb2-1" aria-hidden="true" tabindex="-1"></a><span class="kw">class</span> SemanticKITTIDataset(Dataset):</span>
+<span id="cb2-2"><a href="#cb2-2" aria-hidden="true" tabindex="-1"></a>    <span class="co">"Load the SemanticKITTI data in a pytorch Dataset object."</span></span>
+<span id="cb2-3"><a href="#cb2-3" aria-hidden="true" tabindex="-1"></a>    <span class="kw">def</span> <span class="fu">__init__</span>(<span class="va">self</span>, data_path, split<span class="op">=</span><span class="st">'train'</span>, transform<span class="op">=</span><span class="va">None</span>, remapping_rules<span class="op">=</span><span class="va">None</span>):</span>
+<span id="cb2-4"><a href="#cb2-4" aria-hidden="true" tabindex="-1"></a>        data_path <span class="op">=</span> Path(data_path)</span>
+<span id="cb2-5"><a href="#cb2-5" aria-hidden="true" tabindex="-1"></a>        yaml_path <span class="op">=</span> data_path<span class="op">/</span><span class="st">'semantic-kitti.yaml'</span></span>
+<span id="cb2-6"><a href="#cb2-6" aria-hidden="true" tabindex="-1"></a>        <span class="va">self</span>.velodyne_path <span class="op">=</span> data_path<span class="op">/</span><span class="st">'data_odometry_velodyne/dataset/sequences'</span></span>
+<span id="cb2-7"><a href="#cb2-7" aria-hidden="true" tabindex="-1"></a>        <span class="va">self</span>.labels_path <span class="op">=</span> data_path<span class="op">/</span><span class="st">'data_odometry_labels/dataset/sequences'</span></span>
+<span id="cb2-8"><a href="#cb2-8" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb2-9"><a href="#cb2-9" aria-hidden="true" tabindex="-1"></a>        <span class="cf">with</span> <span class="bu">open</span>(yaml_path, <span class="st">'r'</span>) <span class="im">as</span> <span class="bu">file</span>:</span>
+<span id="cb2-10"><a href="#cb2-10" aria-hidden="true" tabindex="-1"></a>            metadata <span class="op">=</span> yaml.safe_load(<span class="bu">file</span>)</span>
+<span id="cb2-11"><a href="#cb2-11" aria-hidden="true" tabindex="-1"></a>        </span>
+<span id="cb2-12"><a href="#cb2-12" aria-hidden="true" tabindex="-1"></a>        <span class="cf">if</span> split <span class="op">!=</span> <span class="st">'none'</span>:</span>
+<span id="cb2-13"><a href="#cb2-13" aria-hidden="true" tabindex="-1"></a>            sequences <span class="op">=</span> metadata[<span class="st">'split'</span>][split]</span>
+<span id="cb2-14"><a href="#cb2-14" aria-hidden="true" tabindex="-1"></a>            velodyne_fns <span class="op">=</span> []</span>
+<span id="cb2-15"><a href="#cb2-15" aria-hidden="true" tabindex="-1"></a>            <span class="cf">for</span> seq <span class="kw">in</span> sequences:</span>
+<span id="cb2-16"><a href="#cb2-16" aria-hidden="true" tabindex="-1"></a>                velodyne_fns <span class="op">+=</span> <span class="bu">list</span>(<span class="va">self</span>.velodyne_path.rglob(<span class="ss">f'*</span><span class="sc">{</span>seq<span class="sc">:02}</span><span class="ss">/velodyne/*.bin'</span>))</span>
+<span id="cb2-17"><a href="#cb2-17" aria-hidden="true" tabindex="-1"></a>            </span>
+<span id="cb2-18"><a href="#cb2-18" aria-hidden="true" tabindex="-1"></a>            <span class="va">self</span>.frame_ids <span class="op">=</span> [fn.stem <span class="cf">for</span> fn <span class="kw">in</span> velodyne_fns]</span>
+<span id="cb2-19"><a href="#cb2-19" aria-hidden="true" tabindex="-1"></a>            <span class="va">self</span>.frame_sequences <span class="op">=</span> [fn.parts[<span class="op">-</span><span class="dv">3</span>] <span class="cf">for</span> fn <span class="kw">in</span> velodyne_fns]</span>
+<span id="cb2-20"><a href="#cb2-20" aria-hidden="true" tabindex="-1"></a>        <span class="va">self</span>.split <span class="op">=</span> split</span>
+<span id="cb2-21"><a href="#cb2-21" aria-hidden="true" tabindex="-1"></a>        </span>
+<span id="cb2-22"><a href="#cb2-22" aria-hidden="true" tabindex="-1"></a>        <span class="va">self</span>.labels_dict <span class="op">=</span> metadata[<span class="st">'labels'</span>]</span>
+<span id="cb2-23"><a href="#cb2-23" aria-hidden="true" tabindex="-1"></a>        </span>
+<span id="cb2-24"><a href="#cb2-24" aria-hidden="true" tabindex="-1"></a>        <span class="va">self</span>.content <span class="op">=</span> metadata[<span class="st">'content'</span>]</span>
+<span id="cb2-25"><a href="#cb2-25" aria-hidden="true" tabindex="-1"></a>        max_key <span class="op">=</span> <span class="bu">sorted</span>(<span class="va">self</span>.content.keys())[<span class="op">-</span><span class="dv">1</span>]</span>
+<span id="cb2-26"><a href="#cb2-26" aria-hidden="true" tabindex="-1"></a>        <span class="va">self</span>.content_np <span class="op">=</span> np.zeros((max_key<span class="op">+</span><span class="dv">1</span>,), dtype<span class="op">=</span>np.float32)</span>
+<span id="cb2-27"><a href="#cb2-27" aria-hidden="true" tabindex="-1"></a>        <span class="cf">for</span> k, v <span class="kw">in</span> <span class="va">self</span>.content.items():</span>
+<span id="cb2-28"><a href="#cb2-28" aria-hidden="true" tabindex="-1"></a>            <span class="va">self</span>.content_np[k] <span class="op">=</span> v</span>
+<span id="cb2-29"><a href="#cb2-29" aria-hidden="true" tabindex="-1"></a>        </span>
+<span id="cb2-30"><a href="#cb2-30" aria-hidden="true" tabindex="-1"></a>        <span class="va">self</span>.learning_map <span class="op">=</span> metadata[<span class="st">'learning_map'</span>]</span>
+<span id="cb2-31"><a href="#cb2-31" aria-hidden="true" tabindex="-1"></a>        <span class="va">self</span>.learning_map_np <span class="op">=</span> np.zeros((max_key<span class="op">+</span><span class="dv">1</span>,), dtype<span class="op">=</span>np.uint32)</span>
+<span id="cb2-32"><a href="#cb2-32" aria-hidden="true" tabindex="-1"></a>        <span class="cf">for</span> k, v <span class="kw">in</span> <span class="va">self</span>.learning_map.items():</span>
+<span id="cb2-33"><a href="#cb2-33" aria-hidden="true" tabindex="-1"></a>            <span class="va">self</span>.learning_map_np[k] <span class="op">=</span> v</span>
+<span id="cb2-34"><a href="#cb2-34" aria-hidden="true" tabindex="-1"></a>        </span>
+<span id="cb2-35"><a href="#cb2-35" aria-hidden="true" tabindex="-1"></a>        <span class="va">self</span>.learning_map_inv <span class="op">=</span> metadata[<span class="st">'learning_map_inv'</span>]</span>
+<span id="cb2-36"><a href="#cb2-36" aria-hidden="true" tabindex="-1"></a>        <span class="va">self</span>.learning_map_inv_np <span class="op">=</span> np.zeros((<span class="bu">len</span>(<span class="va">self</span>.learning_map_inv),), dtype<span class="op">=</span>np.uint32)</span>
+<span id="cb2-37"><a href="#cb2-37" aria-hidden="true" tabindex="-1"></a>        content_sum_np <span class="op">=</span> np.zeros_like(<span class="va">self</span>.learning_map_inv_np, dtype<span class="op">=</span>np.float32)</span>
+<span id="cb2-38"><a href="#cb2-38" aria-hidden="true" tabindex="-1"></a>        <span class="cf">for</span> k, v <span class="kw">in</span> <span class="va">self</span>.learning_map_inv.items():</span>
+<span id="cb2-39"><a href="#cb2-39" aria-hidden="true" tabindex="-1"></a>            <span class="va">self</span>.learning_map_inv_np[k] <span class="op">=</span> v</span>
+<span id="cb2-40"><a href="#cb2-40" aria-hidden="true" tabindex="-1"></a>            content_sum_np[k] <span class="op">=</span> <span class="va">self</span>.content_np[<span class="va">self</span>.learning_map_np <span class="op">==</span> k].<span class="bu">sum</span>()</span>
+<span id="cb2-41"><a href="#cb2-41" aria-hidden="true" tabindex="-1"></a>        <span class="va">self</span>.content_weights <span class="op">=</span> <span class="fl">1.</span><span class="op">/</span>content_sum_np</span>
+<span id="cb2-42"><a href="#cb2-42" aria-hidden="true" tabindex="-1"></a>        </span>
+<span id="cb2-43"><a href="#cb2-43" aria-hidden="true" tabindex="-1"></a>        <span class="va">self</span>.color_map_bgr <span class="op">=</span> metadata[<span class="st">'color_map'</span>]</span>
+<span id="cb2-44"><a href="#cb2-44" aria-hidden="true" tabindex="-1"></a>        <span class="va">self</span>.color_map_rgb_np <span class="op">=</span> np.zeros((max_key<span class="op">+</span><span class="dv">1</span>, <span class="dv">3</span>), dtype<span class="op">=</span>np.float32)</span>
+<span id="cb2-45"><a href="#cb2-45" aria-hidden="true" tabindex="-1"></a>        <span class="cf">for</span> k, v <span class="kw">in</span> <span class="va">self</span>.color_map_bgr.items():</span>
+<span id="cb2-46"><a href="#cb2-46" aria-hidden="true" tabindex="-1"></a>            <span class="va">self</span>.color_map_rgb_np[k] <span class="op">=</span> np.array(v[::<span class="op">-</span><span class="dv">1</span>], np.float32)</span>
+<span id="cb2-47"><a href="#cb2-47" aria-hidden="true" tabindex="-1"></a>        </span>
+<span id="cb2-48"><a href="#cb2-48" aria-hidden="true" tabindex="-1"></a>        <span class="va">self</span>.transform <span class="op">=</span> transform</span>
+<span id="cb2-49"><a href="#cb2-49" aria-hidden="true" tabindex="-1"></a>        <span class="va">self</span>.is_test <span class="op">=</span> (split <span class="op">==</span> <span class="st">'test'</span>)</span>
+<span id="cb2-50"><a href="#cb2-50" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb2-51"><a href="#cb2-51" aria-hidden="true" tabindex="-1"></a>        <span class="cf">if</span> remapping_rules <span class="kw">is</span> <span class="kw">not</span> <span class="va">None</span>:</span>
+<span id="cb2-52"><a href="#cb2-52" aria-hidden="true" tabindex="-1"></a>            <span class="va">self</span>.learning_remap(remapping_rules)</span>
+<span id="cb2-53"><a href="#cb2-53" aria-hidden="true" tabindex="-1"></a>    </span>
+<span id="cb2-54"><a href="#cb2-54" aria-hidden="true" tabindex="-1"></a>    <span class="kw">def</span> learning_remap(<span class="va">self</span>, remapping_rules):</span>
+<span id="cb2-55"><a href="#cb2-55" aria-hidden="true" tabindex="-1"></a>        new_map_np <span class="op">=</span> np.zeros_like(<span class="va">self</span>.learning_map_np, dtype<span class="op">=</span>np.uint32)</span>
+<span id="cb2-56"><a href="#cb2-56" aria-hidden="true" tabindex="-1"></a>        max_key <span class="op">=</span> <span class="bu">sorted</span>(remapping_rules.values())[<span class="op">-</span><span class="dv">1</span>]</span>
+<span id="cb2-57"><a href="#cb2-57" aria-hidden="true" tabindex="-1"></a>        new_map_inv_np <span class="op">=</span> np.zeros((max_key<span class="op">+</span><span class="dv">1</span>,), dtype<span class="op">=</span>np.uint32)</span>
+<span id="cb2-58"><a href="#cb2-58" aria-hidden="true" tabindex="-1"></a>        <span class="cf">for</span> k, v <span class="kw">in</span> remapping_rules.items():</span>
+<span id="cb2-59"><a href="#cb2-59" aria-hidden="true" tabindex="-1"></a>            new_map_np[<span class="va">self</span>.learning_map_np <span class="op">==</span> k] <span class="op">=</span> v</span>
+<span id="cb2-60"><a href="#cb2-60" aria-hidden="true" tabindex="-1"></a>            <span class="cf">if</span> new_map_inv_np[v] <span class="op">==</span> <span class="dv">0</span>:</span>
+<span id="cb2-61"><a href="#cb2-61" aria-hidden="true" tabindex="-1"></a>                new_map_inv_np[v] <span class="op">=</span> <span class="va">self</span>.learning_map_inv_np[k]</span>
+<span id="cb2-62"><a href="#cb2-62" aria-hidden="true" tabindex="-1"></a>        </span>
+<span id="cb2-63"><a href="#cb2-63" aria-hidden="true" tabindex="-1"></a>        new_content_sum_np <span class="op">=</span> np.zeros_like(new_map_inv_np, dtype<span class="op">=</span>np.float32)</span>
+<span id="cb2-64"><a href="#cb2-64" aria-hidden="true" tabindex="-1"></a>        <span class="cf">for</span> k <span class="kw">in</span> <span class="bu">range</span>(<span class="bu">len</span>(new_map_inv_np)):</span>
+<span id="cb2-65"><a href="#cb2-65" aria-hidden="true" tabindex="-1"></a>            new_content_sum_np[k] <span class="op">=</span> <span class="va">self</span>.content_np[new_map_np <span class="op">==</span> k].<span class="bu">sum</span>()</span>
+<span id="cb2-66"><a href="#cb2-66" aria-hidden="true" tabindex="-1"></a>        </span>
+<span id="cb2-67"><a href="#cb2-67" aria-hidden="true" tabindex="-1"></a>        <span class="va">self</span>.learning_map_np <span class="op">=</span> new_map_np</span>
+<span id="cb2-68"><a href="#cb2-68" aria-hidden="true" tabindex="-1"></a>        <span class="va">self</span>.learning_map_inv_np <span class="op">=</span> new_map_inv_np</span>
+<span id="cb2-69"><a href="#cb2-69" aria-hidden="true" tabindex="-1"></a>        <span class="va">self</span>.content_weights <span class="op">=</span> <span class="fl">1.</span><span class="op">/</span>new_content_sum_np</span>
+<span id="cb2-70"><a href="#cb2-70" aria-hidden="true" tabindex="-1"></a>    </span>
+<span id="cb2-71"><a href="#cb2-71" aria-hidden="true" tabindex="-1"></a>    <span class="kw">def</span> set_transform(<span class="va">self</span>, transform):</span>
+<span id="cb2-72"><a href="#cb2-72" aria-hidden="true" tabindex="-1"></a>        <span class="va">self</span>.transform <span class="op">=</span> transform</span>
+<span id="cb2-73"><a href="#cb2-73" aria-hidden="true" tabindex="-1"></a>    </span>
+<span id="cb2-74"><a href="#cb2-74" aria-hidden="true" tabindex="-1"></a>    <span class="kw">def</span> <span class="fu">__len__</span>(<span class="va">self</span>):</span>
+<span id="cb2-75"><a href="#cb2-75" aria-hidden="true" tabindex="-1"></a>        <span class="cf">return</span> <span class="bu">len</span>(<span class="va">self</span>.frame_ids)</span>
+<span id="cb2-76"><a href="#cb2-76" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb2-77"><a href="#cb2-77" aria-hidden="true" tabindex="-1"></a>    <span class="kw">def</span> <span class="fu">__getitem__</span>(<span class="va">self</span>, idx):</span>
+<span id="cb2-78"><a href="#cb2-78" aria-hidden="true" tabindex="-1"></a>        <span class="cf">assert</span> <span class="va">self</span>.split <span class="op">!=</span> <span class="st">'none'</span></span>
+<span id="cb2-79"><a href="#cb2-79" aria-hidden="true" tabindex="-1"></a>        </span>
+<span id="cb2-80"><a href="#cb2-80" aria-hidden="true" tabindex="-1"></a>        frame_id <span class="op">=</span> <span class="va">self</span>.frame_ids[idx]</span>
+<span id="cb2-81"><a href="#cb2-81" aria-hidden="true" tabindex="-1"></a>        frame_sequence <span class="op">=</span> <span class="va">self</span>.frame_sequences[idx]</span>
+<span id="cb2-82"><a href="#cb2-82" aria-hidden="true" tabindex="-1"></a>        </span>
+<span id="cb2-83"><a href="#cb2-83" aria-hidden="true" tabindex="-1"></a>        frame_path <span class="op">=</span> <span class="va">self</span>.velodyne_path<span class="op">/</span>frame_sequence<span class="op">/</span><span class="st">'velodyne'</span><span class="op">/</span>(frame_id <span class="op">+</span> <span class="st">'.bin'</span>)</span>
+<span id="cb2-84"><a href="#cb2-84" aria-hidden="true" tabindex="-1"></a>        <span class="cf">with</span> <span class="bu">open</span>(frame_path, <span class="st">'rb'</span>) <span class="im">as</span> f:</span>
+<span id="cb2-85"><a href="#cb2-85" aria-hidden="true" tabindex="-1"></a>            frame <span class="op">=</span> np.fromfile(f, dtype<span class="op">=</span>np.float32).reshape(<span class="op">-</span><span class="dv">1</span>, <span class="dv">4</span>)</span>
+<span id="cb2-86"><a href="#cb2-86" aria-hidden="true" tabindex="-1"></a>        </span>
+<span id="cb2-87"><a href="#cb2-87" aria-hidden="true" tabindex="-1"></a>        label <span class="op">=</span> <span class="va">None</span></span>
+<span id="cb2-88"><a href="#cb2-88" aria-hidden="true" tabindex="-1"></a>        mask <span class="op">=</span> <span class="va">None</span></span>
+<span id="cb2-89"><a href="#cb2-89" aria-hidden="true" tabindex="-1"></a>        <span class="cf">if</span> <span class="kw">not</span> <span class="va">self</span>.is_test:</span>
+<span id="cb2-90"><a href="#cb2-90" aria-hidden="true" tabindex="-1"></a>            label_path <span class="op">=</span> <span class="va">self</span>.labels_path<span class="op">/</span>frame_sequence<span class="op">/</span><span class="st">'labels'</span><span class="op">/</span>(frame_id <span class="op">+</span> <span class="st">'.label'</span>)</span>
+<span id="cb2-91"><a href="#cb2-91" aria-hidden="true" tabindex="-1"></a>            <span class="cf">with</span> <span class="bu">open</span>(label_path, <span class="st">'rb'</span>) <span class="im">as</span> f:</span>
+<span id="cb2-92"><a href="#cb2-92" aria-hidden="true" tabindex="-1"></a>                label <span class="op">=</span> np.fromfile(f, dtype<span class="op">=</span>np.uint32)</span>
+<span id="cb2-93"><a href="#cb2-93" aria-hidden="true" tabindex="-1"></a>                label <span class="op">=</span> label <span class="op">&amp;</span> <span class="bn">0xFFFF</span></span>
+<span id="cb2-94"><a href="#cb2-94" aria-hidden="true" tabindex="-1"></a>            label <span class="op">=</span> <span class="va">self</span>.learning_map_np[label]</span>
+<span id="cb2-95"><a href="#cb2-95" aria-hidden="true" tabindex="-1"></a>            mask <span class="op">=</span> label <span class="op">!=</span> <span class="dv">0</span>   <span class="co"># see the field *learning_ignore* in the yaml file</span></span>
+<span id="cb2-96"><a href="#cb2-96" aria-hidden="true" tabindex="-1"></a>        </span>
+<span id="cb2-97"><a href="#cb2-97" aria-hidden="true" tabindex="-1"></a>        item <span class="op">=</span> {</span>
+<span id="cb2-98"><a href="#cb2-98" aria-hidden="true" tabindex="-1"></a>            <span class="st">'frame'</span>: frame,</span>
+<span id="cb2-99"><a href="#cb2-99" aria-hidden="true" tabindex="-1"></a>            <span class="st">'label'</span>: label,</span>
+<span id="cb2-100"><a href="#cb2-100" aria-hidden="true" tabindex="-1"></a>            <span class="st">'mask'</span>: mask</span>
+<span id="cb2-101"><a href="#cb2-101" aria-hidden="true" tabindex="-1"></a>        }</span>
+<span id="cb2-102"><a href="#cb2-102" aria-hidden="true" tabindex="-1"></a>        <span class="cf">if</span> <span class="va">self</span>.transform:</span>
+<span id="cb2-103"><a href="#cb2-103" aria-hidden="true" tabindex="-1"></a>            item <span class="op">=</span> <span class="va">self</span>.transform(item)</span>
+<span id="cb2-104"><a href="#cb2-104" aria-hidden="true" tabindex="-1"></a>        </span>
+<span id="cb2-105"><a href="#cb2-105" aria-hidden="true" tabindex="-1"></a>        <span class="cf">return</span> item</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+</details>
+</div>
+<p>To use the <a href="https://AIR-UFG.github.io/colorcloud/behley2019iccv.html#semantickittidataset"><code>SemanticKITTIDataset</code></a> class, start by downloading the required files from the provided links on their <a href="http://semantic-kitti.org/dataset.html#download">official website</a>. Then, extract these files into a folder <code>data</code>, at the root of your workspace:</p>
+<ul>
+<li><em>data_odometry_velodyne</em></li>
+<li><em>data_odometry_labels</em></li>
+</ul>
+<p>Then, download <strong>one</strong> of the following files with the metadata from the <a href="https://github.com/PRBonn/semantic-kitti-api">semantic-kitti-api</a> to the same folder:</p>
+<ul>
+<li><strong><a href="https://github.com/PRBonn/semantic-kitti-api/blob/master/config/semantic-kitti.yaml">semantic-kitti.yaml</a></strong> (preferred one)</li>
+<li><a href="https://github.com/PRBonn/semantic-kitti-api/blob/master/config/semantic-kitti-all.yaml">semantic-kitti-all.yaml</a></li>
+<li><a href="https://github.com/PRBonn/semantic-kitti-api/blob/master/config/semantic-kitti-coarse.yaml">semantic-kitti-coarse.yaml</a></li>
+<li><a href="https://github.com/PRBonn/semantic-kitti-api/blob/master/config/semantic-kitti-mos.yaml">semantic-kitti-mos.yaml</a></li>
+</ul>
+<p>Summarizing quote from the <a href="https://github.com/PRBonn/semantic-kitti-api">semantic-kitti-api</a> about the content of these files:</p>
+<blockquote class="blockquote">
+<ul>
+<li><p><code>labels</code>: dictionary which maps numeric labels […] to a string class. Example: <code>10: "car"</code></p></li>
+<li><p><code>color_map</code>: dictionary which maps numeric labels […] to a bgr color for visualization. Example <code>10: [245, 150, 100] # car, blue-ish</code></p></li>
+<li><p><code>content</code>: […] a ratio to the number of total points in the dataset. […] used to calculate the weights for the cross entropy […] (in order to handle class imbalance).</p></li>
+<li><p><code>learning_map</code>: dictionary which maps each class label to its cross entropy equivalent, for learning. This is done to mask undesired classes, map different classes together, and because the cross entropy expects a value in [0, numclasses - 1]. […] Examples:</p>
+<div class="sourceCode" id="cb3"><pre class="sourceCode yaml code-with-copy"><code class="sourceCode yaml"><span id="cb3-1"><a href="#cb3-1" aria-hidden="true" tabindex="-1"></a><span class="at">  </span><span class="fu">0 </span><span class="kw">:</span><span class="at"> </span><span class="dv">0</span><span class="co">     # "unlabeled"</span></span>
+<span id="cb3-2"><a href="#cb3-2" aria-hidden="true" tabindex="-1"></a><span class="at">  </span><span class="fu">1 </span><span class="kw">:</span><span class="at"> </span><span class="dv">0</span><span class="co">     # "outlier" to "unlabeled" -&gt; gets ignored in training, with unlabeled</span></span>
+<span id="cb3-3"><a href="#cb3-3" aria-hidden="true" tabindex="-1"></a><span class="at">  </span><span class="fu">10</span><span class="kw">:</span><span class="at"> </span><span class="dv">1</span><span class="co">     # "car"</span></span>
+<span id="cb3-4"><a href="#cb3-4" aria-hidden="true" tabindex="-1"></a><span class="at">  </span><span class="fu">252</span><span class="kw">:</span><span class="at"> </span><span class="dv">1</span><span class="co">    # "moving-car" to "car" -&gt; gets merged with static car class</span></span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div></li>
+<li><p><code>learning_map_inv</code>: dictionary with inverse of the previous mapping […] (for saving point cloud predictions in original label format [and to use the color_map dictionary for visualization]). […]</p></li>
+<li><p><code>learning_ignore</code>: dictionary that contains for each cross entropy class if it will be ignored during training and evaluation or not. For example, class <code>unlabeled</code> gets ignored in both training and evaluation.</p></li>
+<li><p><code>split</code>: contains 3 lists, with the sequence numbers for training, validation, and evaluation.</p></li>
+</ul>
+</blockquote>
+<p>The <a href="https://AIR-UFG.github.io/colorcloud/behley2019iccv.html#semantickittidataset"><code>SemanticKITTIDataset</code></a> class stores this metadata in the following attributes:</p>
+<ul>
+<li><strong>labels</strong>:
+<ol type="1">
+<li><code>self.labels_dict</code>: the original dictionary</li>
+</ol></li>
+<li><strong>color_map</strong>:
+<ol type="1">
+<li><code>self.color_map_bgr</code>: the original dictionary</li>
+<li><code>self.color_map_rgb_np</code>: the colors converted into RGB format and the dictionary converted into a np.array for performance improvements</li>
+</ol></li>
+<li><strong>content</strong>:
+<ol type="1">
+<li><code>self.content</code>: the original dictionary</li>
+<li><code>self.content_np</code>: the dictionary converted into a np.array for performance improvements</li>
+<li><code>self.content_weights</code>: the calculated weights as the inverse of the original content ratios to use with the cross entropy in order to reduce problems due to class imbalance</li>
+</ol></li>
+<li><strong>learning_map</strong>:
+<ol type="1">
+<li><code>self.learning_map</code>: the original dictionary</li>
+<li><code>self.learning_map_np</code>: the dictionary converted into a np.array for performance improvements</li>
+</ol></li>
+<li><strong>learning_map_inv</strong>:
+<ol type="1">
+<li><code>self.learning_map_inv</code>: the original dictionary</li>
+<li><code>self.learning_map_inv_np</code>: the dictionary converted into a np.array for performance improvements</li>
+</ol></li>
+</ul>
+<p>Lastly, use the following code to get the training data in its original format:</p>
+<div id="cell-6" class="cell">
+<div class="sourceCode cell-code" id="cb4"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb4-1"><a href="#cb4-1" aria-hidden="true" tabindex="-1"></a>data_path <span class="op">=</span> <span class="st">'/workspace/data'</span></span>
+<span id="cb4-2"><a href="#cb4-2" aria-hidden="true" tabindex="-1"></a>ds <span class="op">=</span> SemanticKITTIDataset(data_path)</span>
+<span id="cb4-3"><a href="#cb4-3" aria-hidden="true" tabindex="-1"></a>val_ds <span class="op">=</span> SemanticKITTIDataset(data_path, split<span class="op">=</span><span class="st">'valid'</span>)</span>
+<span id="cb4-4"><a href="#cb4-4" aria-hidden="true" tabindex="-1"></a>test_ds <span class="op">=</span> SemanticKITTIDataset(data_path, split<span class="op">=</span><span class="st">'test'</span>)</span>
+<span id="cb4-5"><a href="#cb4-5" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="ss">f'train size:</span><span class="ch">\t</span><span class="sc">{</span><span class="bu">len</span>(ds)<span class="sc">}</span><span class="ch">\n</span><span class="ss">val size:</span><span class="ch">\t</span><span class="sc">{</span><span class="bu">len</span>(val_ds)<span class="sc">}</span><span class="ch">\n</span><span class="ss">test size:</span><span class="ch">\t</span><span class="sc">{</span><span class="bu">len</span>(test_ds)<span class="sc">}</span><span class="ss">'</span>)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output cell-output-stdout">
+<pre><code>train size: 19130
+val size:   4071
+test size:  20351</code></pre>
+</div>
+</div>
+<p>Without setting any transforms, the data is simply read into numpy arrays and stored into a dictionary with the following key-value pairs:</p>
+<ul>
+<li><code>frame</code>: the point cloud readings in a particular timestamp as a sequence of 4D float vectors (i.e.&nbsp;x, y, z, reflectance);</li>
+<li><code>label</code>: for the training set, a sequence of integer labels for each point in the corresponding frame (these labels take into consideration the information in the previously downloaded yaml file);</li>
+<li><code>mask</code>: for the training set, a sequence of booleans for each point in the corresponding frame indicating if the point sould not be ignored during training;</li>
+</ul>
+<p>The mask is hardcoded to ignore only the <code>unlabeled</code> class.</p>
+<div class="callout callout-style-default callout-warning callout-titled">
+<div class="callout-header d-flex align-content-center">
+<div class="callout-icon-container">
+<i class="callout-icon"></i>
+</div>
+<div class="callout-title-container flex-fill">
+Warning
+</div>
+</div>
+<div class="callout-body-container callout-body">
+<p>If you are using the <a href="https://github.com/PRBonn/semantic-kitti-api/blob/master/config/semantic-kitti-coarse.yaml">semantic-kitti-coarse.yaml</a>, remember to update the mask to ignore the <code>dynamic object</code> class as well.</p>
+</div>
+</div>
+<div id="cell-8" class="cell">
+<div class="sourceCode cell-code" id="cb6"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb6-1"><a href="#cb6-1" aria-hidden="true" tabindex="-1"></a>item <span class="op">=</span> ds[<span class="dv">128</span>]</span>
+<span id="cb6-2"><a href="#cb6-2" aria-hidden="true" tabindex="-1"></a>frame <span class="op">=</span> item[<span class="st">'frame'</span>]</span>
+<span id="cb6-3"><a href="#cb6-3" aria-hidden="true" tabindex="-1"></a>frame, frame.shape</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output cell-output-display">
+<pre><code>(array([[35.963676  ,  0.06396142,  1.4249582 ,  0.28      ],
+        [42.710087  ,  0.21486942,  1.6528604 ,  0.11      ],
+        [36.184536  ,  0.2918239 ,  1.4328097 ,  0.15      ],
+        ...,
+        [ 3.793152  , -1.3955092 , -1.7389623 ,  0.4       ],
+        [ 4.0309873 , -1.4794569 , -1.8559116 ,  0.07      ],
+        [ 3.8513408 , -1.3985021 , -1.7649618 ,  0.        ]],
+       dtype=float32),
+ (126063, 4))</code></pre>
+</div>
+</div>
+<div id="cell-9" class="cell">
+<div class="sourceCode cell-code" id="cb8"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb8-1"><a href="#cb8-1" aria-hidden="true" tabindex="-1"></a>label <span class="op">=</span> item[<span class="st">'label'</span>]</span>
+<span id="cb8-2"><a href="#cb8-2" aria-hidden="true" tabindex="-1"></a>label, label.shape, label.dtype, <span class="bu">set</span>(label)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output cell-output-display">
+<pre><code>(array([15, 15, 15, ...,  9,  9,  9], dtype=uint32),
+ (126063,),
+ dtype('uint32'),
+ {0, 1, 2, 3, 9, 11, 13, 14, 15, 16, 17, 18, 19})</code></pre>
+</div>
+</div>
+<div id="cell-10" class="cell">
+<div class="sourceCode cell-code" id="cb10"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb10-1"><a href="#cb10-1" aria-hidden="true" tabindex="-1"></a>mask <span class="op">=</span> item[<span class="st">'mask'</span>]</span>
+<span id="cb10-2"><a href="#cb10-2" aria-hidden="true" tabindex="-1"></a>mask, mask.shape, mask.dtype</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output cell-output-display">
+<pre><code>(array([ True,  True,  True, ...,  True,  True,  True]),
+ (126063,),
+ dtype('bool'))</code></pre>
+</div>
+</div>
+</section>
+</section>
+<section id="lidar-range-image-projections" class="level2">
+<h2 class="anchored" data-anchor-id="lidar-range-image-projections">LiDAR Range Image Projections</h2>
+<p>As referenced in the section <strong>4.1 Single Scan Experiments</strong> of the <a href="https://arxiv.org/pdf/1904.01416">SemanticKITTI paper</a>: &gt; - “In the case of a rotating LiDAR, all points of a single turn can be projected to an image by using a <strong>spherical projection</strong>”</p>
+<p>From the best of our knowledge, the idea of applying projections to turn LiDAR point clouds into range images can be found in the following papers categorized by the projection algorithm and ordered chronologically:</p>
+<ol type="1">
+<li>Sperical/cylindrical projections
+<ul>
+<li><a href="https://arxiv.org/pdf/1710.07368">SqueezeSeg: Convolutional Neural Nets with Recurrent CRF for Real-Time Road-Object Segmentation from 3D LiDAR Point Cloud</a></li>
+<li><a href="https://hal.science/hal-01756975/document">Range-Image: Incorporating sensor topology for LiDAR point cloud processing</a></li>
+<li><a href="https://arxiv.org/pdf/1905.08748">RIU-Net: Embarrassingly simple semantic segmentation of 3D LiDAR point cloud</a></li>
+</ul></li>
+<li>Scan Unfolding projection
+<ul>
+<li><a href="https://arxiv.org/pdf/2004.11803">Scan-based Semantic Segmentation of LiDAR Point Clouds: An Experimental Study</a></li>
+<li><a href="https://arxiv.org/pdf/2102.08009">EfficientLPS: Efficient LiDAR Panoptic Segmentation</a></li>
+</ul></li>
+</ol>
+<hr>
+<p><a href="https://github.com/AIR-UFG/colorcloud/blob/main/colorcloud/behley2019iccv.py#L127" target="_blank" style="float:right; font-size:smaller">source</a></p>
+<section id="sphericalprojection" class="level3">
+<h3 class="anchored" data-anchor-id="sphericalprojection">SphericalProjection</h3>
+<blockquote class="blockquote">
+<pre><code> SphericalProjection (fov_up_deg, fov_down_deg, W, H)</code></pre>
+</blockquote>
+<p><em>Calculate yaw and pitch angles for each point and quantize these angles into image grid.</em></p>
+<div id="cell-13" class="cell">
+<details open="" class="code-fold">
+<summary>Exported source</summary>
+<div class="sourceCode cell-code" id="cb13"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb13-1"><a href="#cb13-1" aria-hidden="true" tabindex="-1"></a><span class="kw">class</span> SphericalProjection:</span>
+<span id="cb13-2"><a href="#cb13-2" aria-hidden="true" tabindex="-1"></a>    <span class="co">"Calculate yaw and pitch angles for each point and quantize these angles into image grid."</span></span>
+<span id="cb13-3"><a href="#cb13-3" aria-hidden="true" tabindex="-1"></a>    <span class="kw">def</span> <span class="fu">__init__</span>(<span class="va">self</span>, fov_up_deg, fov_down_deg, W, H):</span>
+<span id="cb13-4"><a href="#cb13-4" aria-hidden="true" tabindex="-1"></a>        <span class="va">self</span>.fov_up_rad <span class="op">=</span> (fov_up_deg<span class="op">/</span><span class="fl">180.</span>)<span class="op">*</span>np.pi</span>
+<span id="cb13-5"><a href="#cb13-5" aria-hidden="true" tabindex="-1"></a>        <span class="va">self</span>.fov_down_rad <span class="op">=</span> (fov_down_deg<span class="op">/</span><span class="fl">180.</span>)<span class="op">*</span>np.pi</span>
+<span id="cb13-6"><a href="#cb13-6" aria-hidden="true" tabindex="-1"></a>        <span class="va">self</span>.fov_rad <span class="op">=</span> <span class="va">self</span>.fov_up_rad <span class="op">-</span> <span class="va">self</span>.fov_down_rad</span>
+<span id="cb13-7"><a href="#cb13-7" aria-hidden="true" tabindex="-1"></a>        <span class="va">self</span>.W <span class="op">=</span> W</span>
+<span id="cb13-8"><a href="#cb13-8" aria-hidden="true" tabindex="-1"></a>        <span class="va">self</span>.H <span class="op">=</span> H</span>
+<span id="cb13-9"><a href="#cb13-9" aria-hidden="true" tabindex="-1"></a>    </span>
+<span id="cb13-10"><a href="#cb13-10" aria-hidden="true" tabindex="-1"></a>    <span class="kw">def</span> get_xy_projections(<span class="va">self</span>, scan_xyz, depth):</span>
+<span id="cb13-11"><a href="#cb13-11" aria-hidden="true" tabindex="-1"></a>        <span class="co"># get angles of all points</span></span>
+<span id="cb13-12"><a href="#cb13-12" aria-hidden="true" tabindex="-1"></a>        yaw <span class="op">=</span> np.arctan2(scan_xyz[:,<span class="dv">1</span>], scan_xyz[:,<span class="dv">0</span>])</span>
+<span id="cb13-13"><a href="#cb13-13" aria-hidden="true" tabindex="-1"></a>        pitch <span class="op">=</span> np.arcsin(scan_xyz[:,<span class="dv">2</span>] <span class="op">/</span> depth)</span>
+<span id="cb13-14"><a href="#cb13-14" aria-hidden="true" tabindex="-1"></a>        </span>
+<span id="cb13-15"><a href="#cb13-15" aria-hidden="true" tabindex="-1"></a>        <span class="co"># get projections in image coords (between [0.0, 1.0])</span></span>
+<span id="cb13-16"><a href="#cb13-16" aria-hidden="true" tabindex="-1"></a>        proj_x <span class="op">=</span> <span class="fl">0.5</span><span class="op">*</span>(<span class="fl">1.</span> <span class="op">+</span> yaw<span class="op">/</span>np.pi)</span>
+<span id="cb13-17"><a href="#cb13-17" aria-hidden="true" tabindex="-1"></a>        proj_y <span class="op">=</span> (<span class="va">self</span>.fov_up_rad <span class="op">-</span> pitch)<span class="op">/</span><span class="va">self</span>.fov_rad</span>
+<span id="cb13-18"><a href="#cb13-18" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb13-19"><a href="#cb13-19" aria-hidden="true" tabindex="-1"></a>        <span class="co"># just making sure nothing wierd happened with the np.arctan2 function</span></span>
+<span id="cb13-20"><a href="#cb13-20" aria-hidden="true" tabindex="-1"></a>        <span class="cf">assert</span> proj_x.<span class="bu">min</span>() <span class="op">&gt;=</span> <span class="fl">0.</span></span>
+<span id="cb13-21"><a href="#cb13-21" aria-hidden="true" tabindex="-1"></a>        <span class="cf">assert</span> proj_x.<span class="bu">max</span>() <span class="op">&lt;=</span> <span class="fl">1.</span></span>
+<span id="cb13-22"><a href="#cb13-22" aria-hidden="true" tabindex="-1"></a>        <span class="co"># filter points outside the fov as outliers</span></span>
+<span id="cb13-23"><a href="#cb13-23" aria-hidden="true" tabindex="-1"></a>        outliers <span class="op">=</span> (proj_y <span class="op">&lt;</span> <span class="fl">0.</span>)<span class="op">|</span>(proj_y <span class="op">&gt;=</span> <span class="fl">1.</span>)</span>
+<span id="cb13-24"><a href="#cb13-24" aria-hidden="true" tabindex="-1"></a>        </span>
+<span id="cb13-25"><a href="#cb13-25" aria-hidden="true" tabindex="-1"></a>        <span class="co"># scale to image size using angular resolution (between [0.0, W/H])</span></span>
+<span id="cb13-26"><a href="#cb13-26" aria-hidden="true" tabindex="-1"></a>        proj_x <span class="op">*=</span> <span class="va">self</span>.W</span>
+<span id="cb13-27"><a href="#cb13-27" aria-hidden="true" tabindex="-1"></a>        proj_y <span class="op">*=</span> <span class="va">self</span>.H</span>
+<span id="cb13-28"><a href="#cb13-28" aria-hidden="true" tabindex="-1"></a>        </span>
+<span id="cb13-29"><a href="#cb13-29" aria-hidden="true" tabindex="-1"></a>        <span class="co"># round and clamp to use as indices (between [0, W/H - 1])</span></span>
+<span id="cb13-30"><a href="#cb13-30" aria-hidden="true" tabindex="-1"></a>        proj_x <span class="op">=</span> np.floor(proj_x)</span>
+<span id="cb13-31"><a href="#cb13-31" aria-hidden="true" tabindex="-1"></a>        proj_x <span class="op">=</span> np.clip(proj_x, <span class="dv">0</span>, <span class="va">self</span>.W <span class="op">-</span> <span class="dv">1</span>).astype(np.int32)</span>
+<span id="cb13-32"><a href="#cb13-32" aria-hidden="true" tabindex="-1"></a>        </span>
+<span id="cb13-33"><a href="#cb13-33" aria-hidden="true" tabindex="-1"></a>        proj_y <span class="op">=</span> np.floor(proj_y)</span>
+<span id="cb13-34"><a href="#cb13-34" aria-hidden="true" tabindex="-1"></a>        proj_y <span class="op">=</span> np.clip(proj_y, <span class="dv">0</span>, <span class="va">self</span>.H <span class="op">-</span> <span class="dv">1</span>).astype(np.int32)</span>
+<span id="cb13-35"><a href="#cb13-35" aria-hidden="true" tabindex="-1"></a>        </span>
+<span id="cb13-36"><a href="#cb13-36" aria-hidden="true" tabindex="-1"></a>        <span class="cf">return</span> proj_x, proj_y, outliers</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+</details>
+</div>
+<p>The following images from the Medium article <a href="https://towardsdatascience.com/spherical-projection-for-point-clouds-56a2fc258e6c">Spherical Projection for Point Clouds</a> illustrate the process in the spherical projection calculation:</p>
+<div class="quarto-figure quarto-figure-center">
+<figure class="figure">
+<p><img src="https://miro.medium.com/v2/resize:fit:828/format:webp/1*FEg6D6V_CzlSaDsCxXzfLg.png" class="img-fluid figure-img"></p>
+<figcaption>Figure 1: Topology of the LiDAR sensor. In the image, the author shows an example with a LiDAR with 16 lasers.</figcaption>
+</figure>
+</div>
+<div class="quarto-figure quarto-figure-center">
+<figure class="figure">
+<p><img src="https://miro.medium.com/v2/resize:fit:1400/format:webp/1*dwx4RdGRknJUk415dZoILw.png" class="img-fluid figure-img"></p>
+<figcaption>Figure 2: Spherical coordinate system and its relation to the projection image grid.</figcaption>
+</figure>
+</div>
+<hr>
+<p><a href="https://github.com/AIR-UFG/colorcloud/blob/main/colorcloud/behley2019iccv.py#L165" target="_blank" style="float:right; font-size:smaller">source</a></p>
+</section>
+<section id="unfoldingprojection" class="level3">
+<h3 class="anchored" data-anchor-id="unfoldingprojection">UnfoldingProjection</h3>
+<blockquote class="blockquote">
+<pre><code> UnfoldingProjection (W, H)</code></pre>
+</blockquote>
+<p><em>Assume the points are sorted in increasing yaw order and line number.</em></p>
+<div id="cell-16" class="cell">
+<details open="" class="code-fold">
+<summary>Exported source</summary>
+<div class="sourceCode cell-code" id="cb15"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb15-1"><a href="#cb15-1" aria-hidden="true" tabindex="-1"></a><span class="kw">class</span> UnfoldingProjection:</span>
+<span id="cb15-2"><a href="#cb15-2" aria-hidden="true" tabindex="-1"></a>    <span class="co">"Assume the points are sorted in increasing yaw order and line number."</span></span>
+<span id="cb15-3"><a href="#cb15-3" aria-hidden="true" tabindex="-1"></a>    <span class="kw">def</span> <span class="fu">__init__</span>(<span class="va">self</span>, W, H):</span>
+<span id="cb15-4"><a href="#cb15-4" aria-hidden="true" tabindex="-1"></a>        <span class="va">self</span>.W <span class="op">=</span> W</span>
+<span id="cb15-5"><a href="#cb15-5" aria-hidden="true" tabindex="-1"></a>        <span class="va">self</span>.H <span class="op">=</span> H</span>
+<span id="cb15-6"><a href="#cb15-6" aria-hidden="true" tabindex="-1"></a>    </span>
+<span id="cb15-7"><a href="#cb15-7" aria-hidden="true" tabindex="-1"></a>    <span class="kw">def</span> get_xy_projections(<span class="va">self</span>, scan_xyz, depth):</span>
+<span id="cb15-8"><a href="#cb15-8" aria-hidden="true" tabindex="-1"></a>        <span class="co"># get yaw angles of all points</span></span>
+<span id="cb15-9"><a href="#cb15-9" aria-hidden="true" tabindex="-1"></a>        yaw <span class="op">=</span> np.arctan2(scan_xyz[:,<span class="dv">1</span>], scan_xyz[:,<span class="dv">0</span>])</span>
+<span id="cb15-10"><a href="#cb15-10" aria-hidden="true" tabindex="-1"></a>        </span>
+<span id="cb15-11"><a href="#cb15-11" aria-hidden="true" tabindex="-1"></a>        <span class="co"># rectify yaw value to be between ]0, 2*pi[</span></span>
+<span id="cb15-12"><a href="#cb15-12" aria-hidden="true" tabindex="-1"></a>        yaw[yaw <span class="op">&lt;</span> <span class="dv">0</span>] <span class="op">+=</span> <span class="fl">2.</span><span class="op">*</span>np.pi</span>
+<span id="cb15-13"><a href="#cb15-13" aria-hidden="true" tabindex="-1"></a>        </span>
+<span id="cb15-14"><a href="#cb15-14" aria-hidden="true" tabindex="-1"></a>        <span class="co"># scale to image size</span></span>
+<span id="cb15-15"><a href="#cb15-15" aria-hidden="true" tabindex="-1"></a>        proj_x  <span class="op">=</span> np.floor(<span class="va">self</span>.W<span class="op">*</span><span class="fl">0.5</span><span class="op">*</span>yaw<span class="op">/</span>np.pi).astype(np.int32)</span>
+<span id="cb15-16"><a href="#cb15-16" aria-hidden="true" tabindex="-1"></a>        </span>
+<span id="cb15-17"><a href="#cb15-17" aria-hidden="true" tabindex="-1"></a>        <span class="co"># just making sure nothing wierd happened with the np.arctan2 or the np.floor functions</span></span>
+<span id="cb15-18"><a href="#cb15-18" aria-hidden="true" tabindex="-1"></a>        <span class="cf">assert</span> proj_x.<span class="bu">min</span>() <span class="op">&gt;=</span> <span class="dv">0</span></span>
+<span id="cb15-19"><a href="#cb15-19" aria-hidden="true" tabindex="-1"></a>        <span class="cf">assert</span> proj_x.<span class="bu">max</span>() <span class="op">&lt;</span> <span class="va">self</span>.W</span>
+<span id="cb15-20"><a href="#cb15-20" aria-hidden="true" tabindex="-1"></a>        </span>
+<span id="cb15-21"><a href="#cb15-21" aria-hidden="true" tabindex="-1"></a>        <span class="co"># find discontinuities ("jumps") from scan completing cycle</span></span>
+<span id="cb15-22"><a href="#cb15-22" aria-hidden="true" tabindex="-1"></a>        jump <span class="op">=</span> yaw[<span class="dv">1</span>:] <span class="op">-</span> yaw[:<span class="op">-</span><span class="dv">1</span>] <span class="op">&lt;</span> <span class="op">-</span>np.pi</span>
+<span id="cb15-23"><a href="#cb15-23" aria-hidden="true" tabindex="-1"></a>        jump <span class="op">=</span> np.concatenate((np.zeros(<span class="dv">1</span>), jump))</span>
+<span id="cb15-24"><a href="#cb15-24" aria-hidden="true" tabindex="-1"></a>        </span>
+<span id="cb15-25"><a href="#cb15-25" aria-hidden="true" tabindex="-1"></a>        <span class="co"># every jump indicates a new scan row</span></span>
+<span id="cb15-26"><a href="#cb15-26" aria-hidden="true" tabindex="-1"></a>        proj_y <span class="op">=</span> jump.cumsum().astype(np.int32)</span>
+<span id="cb15-27"><a href="#cb15-27" aria-hidden="true" tabindex="-1"></a>        </span>
+<span id="cb15-28"><a href="#cb15-28" aria-hidden="true" tabindex="-1"></a>        <span class="co"># for debugging only</span></span>
+<span id="cb15-29"><a href="#cb15-29" aria-hidden="true" tabindex="-1"></a>        <span class="cf">if</span> proj_y.<span class="bu">max</span>() <span class="op">&gt;</span> <span class="va">self</span>.H <span class="op">-</span> <span class="dv">1</span>:</span>
+<span id="cb15-30"><a href="#cb15-30" aria-hidden="true" tabindex="-1"></a>            <span class="bu">print</span>(proj_y.<span class="bu">max</span>())</span>
+<span id="cb15-31"><a href="#cb15-31" aria-hidden="true" tabindex="-1"></a>        <span class="cf">assert</span> proj_y.<span class="bu">max</span>() <span class="op">&lt;=</span> <span class="va">self</span>.H <span class="op">-</span> <span class="dv">1</span></span>
+<span id="cb15-32"><a href="#cb15-32" aria-hidden="true" tabindex="-1"></a>        </span>
+<span id="cb15-33"><a href="#cb15-33" aria-hidden="true" tabindex="-1"></a>        <span class="cf">return</span> proj_x, proj_y, <span class="va">None</span></span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+</details>
+</div>
+<p>If the points are sorted in increasing yaw order and line number (which is the case in the SemanticKITTI dataset), then the projection lines can be found by making sure that discontinuities in yaw sequences come from scan completing cycles. That way, we can find these discontinuities and then quantize the yaw angles in the projection lines so they can be assigned to each pixel in the image grid.</p>
+<p>To make sure the discontinuites happen from one scan line to another, we take into consideration that the vehicle used in the SemanticKITTI dataset has the following <a href="https://www.cvlibs.net/datasets/kitti/setup.php">sensor configuration</a>:</p>
+<p><img src="https://www.cvlibs.net/datasets/kitti/images/passat_sensors_920.png" class="img-fluid"></p>
+<p>We also know that the LiDAR sensor rotates its lasers in a counter-clockwise direction and that a LiDAR frame starts and finishes when the lasers cross the <em>x axis</em>. Therefore, we calculate the yaw angles with the <code>np.arctan2</code> function and then add <span class="math inline">\(2\pi\)</span> to the ones that are negative. The plot below, shows this trick on toy example data:</p>
+<div id="cell-18" class="cell">
+<div class="sourceCode cell-code" id="cb16"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb16-1"><a href="#cb16-1" aria-hidden="true" tabindex="-1"></a>fake_yaw_raw_data <span class="op">=</span> np.concatenate((np.linspace(<span class="fl">0.01</span>,np.pi), np.linspace(<span class="op">-</span>np.pi, <span class="op">-</span><span class="fl">0.01</span>)))</span>
+<span id="cb16-2"><a href="#cb16-2" aria-hidden="true" tabindex="-1"></a>fake_data_x <span class="op">=</span> np.cos(fake_yaw_raw_data)</span>
+<span id="cb16-3"><a href="#cb16-3" aria-hidden="true" tabindex="-1"></a>fake_data_y <span class="op">=</span> np.sin(fake_yaw_raw_data)</span>
+<span id="cb16-4"><a href="#cb16-4" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb16-5"><a href="#cb16-5" aria-hidden="true" tabindex="-1"></a>plt.scatter(fake_data_y, fake_data_x)<span class="op">;</span></span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output cell-output-display">
+<div>
+<figure class="figure">
+<p><img src="00_behley2019iccv_files/figure-html/cell-12-output-1.png" class="img-fluid figure-img"></p>
+</figure>
+</div>
+</div>
+</div>
+<div id="cell-19" class="cell">
+<div class="sourceCode cell-code" id="cb17"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb17-1"><a href="#cb17-1" aria-hidden="true" tabindex="-1"></a>fake_yaw <span class="op">=</span> np.arctan2(fake_data_y, fake_data_x)</span>
+<span id="cb17-2"><a href="#cb17-2" aria-hidden="true" tabindex="-1"></a>fake_yaw_corrected <span class="op">=</span> np.arctan2(fake_data_y, fake_data_x)</span>
+<span id="cb17-3"><a href="#cb17-3" aria-hidden="true" tabindex="-1"></a>fake_yaw_corrected[fake_yaw_corrected <span class="op">&lt;</span> <span class="dv">0</span>] <span class="op">+=</span> <span class="fl">2.</span><span class="op">*</span>np.pi</span>
+<span id="cb17-4"><a href="#cb17-4" aria-hidden="true" tabindex="-1"></a>plt.plot(fake_yaw)</span>
+<span id="cb17-5"><a href="#cb17-5" aria-hidden="true" tabindex="-1"></a>plt.plot(fake_yaw_corrected)<span class="op">;</span></span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output cell-output-display">
+<div>
+<figure class="figure">
+<p><img src="00_behley2019iccv_files/figure-html/cell-13-output-1.png" class="img-fluid figure-img"></p>
+</figure>
+</div>
+</div>
+</div>
+<p>From this trick, we can simply detect the end of each projection line by checking when the diference between adjacent angles is smaller than some threshold. After some experimentation with different samples, a threshold of <span class="math inline">\(-\pi\)</span> seems to be robust even if there are some missing readings from the LiDAR.</p>
+<div id="cell-21" class="cell">
+<div class="sourceCode cell-code" id="cb18"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb18-1"><a href="#cb18-1" aria-hidden="true" tabindex="-1"></a>two_lines <span class="op">=</span> np.concatenate((fake_yaw_corrected, fake_yaw_corrected))</span>
+<span id="cb18-2"><a href="#cb18-2" aria-hidden="true" tabindex="-1"></a>jump <span class="op">=</span> two_lines[<span class="dv">1</span>:] <span class="op">-</span> two_lines[:<span class="op">-</span><span class="dv">1</span>] <span class="op">&lt;</span> <span class="op">-</span>np.pi</span>
+<span id="cb18-3"><a href="#cb18-3" aria-hidden="true" tabindex="-1"></a>plt.plot(jump)<span class="op">;</span></span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output cell-output-display">
+<div>
+<figure class="figure">
+<p><img src="00_behley2019iccv_files/figure-html/cell-14-output-1.png" class="img-fluid figure-img"></p>
+</figure>
+</div>
+</div>
+</div>
+<hr>
+<p><a href="https://github.com/AIR-UFG/colorcloud/blob/main/colorcloud/behley2019iccv.py#L200" target="_blank" style="float:right; font-size:smaller">source</a></p>
+</section>
+<section id="projectiontransform" class="level3">
+<h3 class="anchored" data-anchor-id="projectiontransform">ProjectionTransform</h3>
+<blockquote class="blockquote">
+<pre><code> ProjectionTransform (projection)</code></pre>
+</blockquote>
+<p><em>Pytorch transform that turns a point cloud frame and its respective label and mask arrays into images in given projection style.</em></p>
+<div id="cell-23" class="cell">
+<details open="" class="code-fold">
+<summary>Exported source</summary>
+<div class="sourceCode cell-code" id="cb20"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb20-1"><a href="#cb20-1" aria-hidden="true" tabindex="-1"></a><span class="kw">class</span> ProjectionTransform(nn.Module):</span>
+<span id="cb20-2"><a href="#cb20-2" aria-hidden="true" tabindex="-1"></a>    <span class="co">"Pytorch transform that turns a point cloud frame and its respective label and mask arrays into images in given projection style."</span></span>
+<span id="cb20-3"><a href="#cb20-3" aria-hidden="true" tabindex="-1"></a>    <span class="kw">def</span> <span class="fu">__init__</span>(<span class="va">self</span>, projection):</span>
+<span id="cb20-4"><a href="#cb20-4" aria-hidden="true" tabindex="-1"></a>        <span class="bu">super</span>().<span class="fu">__init__</span>()</span>
+<span id="cb20-5"><a href="#cb20-5" aria-hidden="true" tabindex="-1"></a>        <span class="va">self</span>.projection <span class="op">=</span> projection</span>
+<span id="cb20-6"><a href="#cb20-6" aria-hidden="true" tabindex="-1"></a>        <span class="va">self</span>.W <span class="op">=</span> projection.W</span>
+<span id="cb20-7"><a href="#cb20-7" aria-hidden="true" tabindex="-1"></a>        <span class="va">self</span>.H <span class="op">=</span> projection.H</span>
+<span id="cb20-8"><a href="#cb20-8" aria-hidden="true" tabindex="-1"></a>        </span>
+<span id="cb20-9"><a href="#cb20-9" aria-hidden="true" tabindex="-1"></a>    <span class="kw">def</span> forward(<span class="va">self</span>, item):</span>
+<span id="cb20-10"><a href="#cb20-10" aria-hidden="true" tabindex="-1"></a>        frame <span class="op">=</span> item[<span class="st">'frame'</span>]</span>
+<span id="cb20-11"><a href="#cb20-11" aria-hidden="true" tabindex="-1"></a>        label <span class="op">=</span> item[<span class="st">'label'</span>]</span>
+<span id="cb20-12"><a href="#cb20-12" aria-hidden="true" tabindex="-1"></a>        mask <span class="op">=</span> item[<span class="st">'mask'</span>]</span>
+<span id="cb20-13"><a href="#cb20-13" aria-hidden="true" tabindex="-1"></a>        </span>
+<span id="cb20-14"><a href="#cb20-14" aria-hidden="true" tabindex="-1"></a>        <span class="co"># get point_cloud components</span></span>
+<span id="cb20-15"><a href="#cb20-15" aria-hidden="true" tabindex="-1"></a>        scan_xyz <span class="op">=</span> frame[:,:<span class="dv">3</span>]</span>
+<span id="cb20-16"><a href="#cb20-16" aria-hidden="true" tabindex="-1"></a>        reflectance <span class="op">=</span> frame[:, <span class="dv">3</span>]</span>
+<span id="cb20-17"><a href="#cb20-17" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb20-18"><a href="#cb20-18" aria-hidden="true" tabindex="-1"></a>        <span class="cf">assert</span> reflectance.<span class="bu">max</span>() <span class="op">&lt;=</span> <span class="fl">1.</span></span>
+<span id="cb20-19"><a href="#cb20-19" aria-hidden="true" tabindex="-1"></a>        <span class="cf">assert</span> reflectance.<span class="bu">min</span>() <span class="op">&gt;=</span> <span class="fl">0.</span></span>
+<span id="cb20-20"><a href="#cb20-20" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb20-21"><a href="#cb20-21" aria-hidden="true" tabindex="-1"></a>        <span class="co"># get depths of all points</span></span>
+<span id="cb20-22"><a href="#cb20-22" aria-hidden="true" tabindex="-1"></a>        depth <span class="op">=</span> np.linalg.norm(scan_xyz, <span class="dv">2</span>, axis<span class="op">=</span><span class="dv">1</span>)</span>
+<span id="cb20-23"><a href="#cb20-23" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb20-24"><a href="#cb20-24" aria-hidden="true" tabindex="-1"></a>        <span class="co"># get projections and outliers</span></span>
+<span id="cb20-25"><a href="#cb20-25" aria-hidden="true" tabindex="-1"></a>        proj_x, proj_y, outliers <span class="op">=</span> <span class="va">self</span>.projection.get_xy_projections(scan_xyz, depth)</span>
+<span id="cb20-26"><a href="#cb20-26" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb20-27"><a href="#cb20-27" aria-hidden="true" tabindex="-1"></a>        <span class="co"># filter outliers</span></span>
+<span id="cb20-28"><a href="#cb20-28" aria-hidden="true" tabindex="-1"></a>        <span class="cf">if</span> outliers <span class="kw">is</span> <span class="kw">not</span> <span class="va">None</span>:</span>
+<span id="cb20-29"><a href="#cb20-29" aria-hidden="true" tabindex="-1"></a>            proj_x <span class="op">=</span> proj_x[<span class="op">~</span>outliers]</span>
+<span id="cb20-30"><a href="#cb20-30" aria-hidden="true" tabindex="-1"></a>            proj_y <span class="op">=</span> proj_y[<span class="op">~</span>outliers]</span>
+<span id="cb20-31"><a href="#cb20-31" aria-hidden="true" tabindex="-1"></a>            scan_xyz <span class="op">=</span> scan_xyz[<span class="op">~</span>outliers]</span>
+<span id="cb20-32"><a href="#cb20-32" aria-hidden="true" tabindex="-1"></a>            reflectance <span class="op">=</span> reflectance[<span class="op">~</span>outliers]</span>
+<span id="cb20-33"><a href="#cb20-33" aria-hidden="true" tabindex="-1"></a>            depth <span class="op">=</span> depth[<span class="op">~</span>outliers]</span>
+<span id="cb20-34"><a href="#cb20-34" aria-hidden="true" tabindex="-1"></a>            <span class="cf">if</span> label <span class="kw">is</span> <span class="kw">not</span> <span class="va">None</span>:</span>
+<span id="cb20-35"><a href="#cb20-35" aria-hidden="true" tabindex="-1"></a>                label <span class="op">=</span> label[<span class="op">~</span>outliers]</span>
+<span id="cb20-36"><a href="#cb20-36" aria-hidden="true" tabindex="-1"></a>                mask <span class="op">=</span> mask[<span class="op">~</span>outliers]</span>
+<span id="cb20-37"><a href="#cb20-37" aria-hidden="true" tabindex="-1"></a>        </span>
+<span id="cb20-38"><a href="#cb20-38" aria-hidden="true" tabindex="-1"></a>        <span class="co"># order in decreasing depth</span></span>
+<span id="cb20-39"><a href="#cb20-39" aria-hidden="true" tabindex="-1"></a>        order <span class="op">=</span> np.argsort(depth)[::<span class="op">-</span><span class="dv">1</span>]</span>
+<span id="cb20-40"><a href="#cb20-40" aria-hidden="true" tabindex="-1"></a>        info_list <span class="op">=</span> [</span>
+<span id="cb20-41"><a href="#cb20-41" aria-hidden="true" tabindex="-1"></a>            scan_xyz,</span>
+<span id="cb20-42"><a href="#cb20-42" aria-hidden="true" tabindex="-1"></a>            reflectance[..., np.newaxis],</span>
+<span id="cb20-43"><a href="#cb20-43" aria-hidden="true" tabindex="-1"></a>            depth[..., np.newaxis]</span>
+<span id="cb20-44"><a href="#cb20-44" aria-hidden="true" tabindex="-1"></a>        ]</span>
+<span id="cb20-45"><a href="#cb20-45" aria-hidden="true" tabindex="-1"></a>        <span class="cf">if</span> label <span class="kw">is</span> <span class="kw">not</span> <span class="va">None</span>:</span>
+<span id="cb20-46"><a href="#cb20-46" aria-hidden="true" tabindex="-1"></a>            info_list <span class="op">+=</span> [mask[..., np.newaxis]]</span>
+<span id="cb20-47"><a href="#cb20-47" aria-hidden="true" tabindex="-1"></a>            info_list <span class="op">+=</span> [label[..., np.newaxis]]</span>
+<span id="cb20-48"><a href="#cb20-48" aria-hidden="true" tabindex="-1"></a>            </span>
+<span id="cb20-49"><a href="#cb20-49" aria-hidden="true" tabindex="-1"></a>        scan_info <span class="op">=</span> np.concatenate(info_list, axis<span class="op">=-</span><span class="dv">1</span>)</span>
+<span id="cb20-50"><a href="#cb20-50" aria-hidden="true" tabindex="-1"></a>        scan_info <span class="op">=</span> scan_info[order]</span>
+<span id="cb20-51"><a href="#cb20-51" aria-hidden="true" tabindex="-1"></a>        proj_y <span class="op">=</span> proj_y[order]</span>
+<span id="cb20-52"><a href="#cb20-52" aria-hidden="true" tabindex="-1"></a>        proj_x <span class="op">=</span> proj_x[order]</span>
+<span id="cb20-53"><a href="#cb20-53" aria-hidden="true" tabindex="-1"></a>        </span>
+<span id="cb20-54"><a href="#cb20-54" aria-hidden="true" tabindex="-1"></a>        <span class="co"># setup the image tensor</span></span>
+<span id="cb20-55"><a href="#cb20-55" aria-hidden="true" tabindex="-1"></a>        projections_img <span class="op">=</span> np.zeros((<span class="va">self</span>.H, <span class="va">self</span>.W, <span class="dv">2</span><span class="op">+</span><span class="bu">len</span>(info_list)), dtype<span class="op">=</span>np.float32)</span>
+<span id="cb20-56"><a href="#cb20-56" aria-hidden="true" tabindex="-1"></a>        projections_img[:,:,<span class="op">-</span><span class="dv">1</span>] <span class="op">-=</span> <span class="dv">1</span> <span class="co"># this helps to identify points in the projection with no LiDAR readings</span></span>
+<span id="cb20-57"><a href="#cb20-57" aria-hidden="true" tabindex="-1"></a>        projections_img[proj_y, proj_x] <span class="op">=</span> scan_info</span>
+<span id="cb20-58"><a href="#cb20-58" aria-hidden="true" tabindex="-1"></a>        </span>
+<span id="cb20-59"><a href="#cb20-59" aria-hidden="true" tabindex="-1"></a>        <span class="cf">if</span> label <span class="kw">is</span> <span class="kw">not</span> <span class="va">None</span>:</span>
+<span id="cb20-60"><a href="#cb20-60" aria-hidden="true" tabindex="-1"></a>            frame_img <span class="op">=</span> projections_img[:,:,:<span class="op">-</span><span class="dv">2</span>]</span>
+<span id="cb20-61"><a href="#cb20-61" aria-hidden="true" tabindex="-1"></a>            label_img <span class="op">=</span> projections_img[:,:,<span class="op">-</span><span class="dv">1</span>].astype(np.int32)</span>
+<span id="cb20-62"><a href="#cb20-62" aria-hidden="true" tabindex="-1"></a>            mask_img <span class="op">=</span> projections_img[:,:,<span class="op">-</span><span class="dv">2</span>].astype(<span class="bu">bool</span>)</span>
+<span id="cb20-63"><a href="#cb20-63" aria-hidden="true" tabindex="-1"></a>            mask_img <span class="op">=</span> mask_img <span class="op">&amp;</span> (label_img <span class="op">&gt;</span> <span class="op">-</span><span class="dv">1</span>)</span>
+<span id="cb20-64"><a href="#cb20-64" aria-hidden="true" tabindex="-1"></a>        <span class="cf">else</span>:</span>
+<span id="cb20-65"><a href="#cb20-65" aria-hidden="true" tabindex="-1"></a>            frame_img <span class="op">=</span> projections_img</span>
+<span id="cb20-66"><a href="#cb20-66" aria-hidden="true" tabindex="-1"></a>            label_img <span class="op">=</span> <span class="va">None</span></span>
+<span id="cb20-67"><a href="#cb20-67" aria-hidden="true" tabindex="-1"></a>            mask_img <span class="op">=</span> projections_img[:,:,<span class="op">-</span><span class="dv">1</span>] <span class="op">&gt;=</span> <span class="dv">0</span></span>
+<span id="cb20-68"><a href="#cb20-68" aria-hidden="true" tabindex="-1"></a>        </span>
+<span id="cb20-69"><a href="#cb20-69" aria-hidden="true" tabindex="-1"></a>        item <span class="op">=</span> {</span>
+<span id="cb20-70"><a href="#cb20-70" aria-hidden="true" tabindex="-1"></a>            <span class="st">'frame'</span>: frame_img,</span>
+<span id="cb20-71"><a href="#cb20-71" aria-hidden="true" tabindex="-1"></a>            <span class="st">'label'</span>: label_img,</span>
+<span id="cb20-72"><a href="#cb20-72" aria-hidden="true" tabindex="-1"></a>            <span class="st">'mask'</span>: mask_img,</span>
+<span id="cb20-73"><a href="#cb20-73" aria-hidden="true" tabindex="-1"></a>        }</span>
+<span id="cb20-74"><a href="#cb20-74" aria-hidden="true" tabindex="-1"></a>        <span class="cf">return</span> item</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+</details>
+</div>
+<p>With one of the projection algorithms described previously, we can construct a <a href="https://AIR-UFG.github.io/colorcloud/behley2019iccv.html#projectiontransform"><code>ProjectionTransform</code></a> object that can be used with the <a href="https://AIR-UFG.github.io/colorcloud/behley2019iccv.html#semantickittidataset"><code>SemanticKITTIDataset</code></a>. Here is an example on how to use it:</p>
+<div id="cell-25" class="cell">
+<div class="sourceCode cell-code" id="cb21"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb21-1"><a href="#cb21-1" aria-hidden="true" tabindex="-1"></a>proj <span class="op">=</span> SphericalProjection(fov_up_deg<span class="op">=</span><span class="fl">3.</span>, fov_down_deg<span class="op">=-</span><span class="fl">25.</span>, W<span class="op">=</span><span class="dv">1024</span>, H<span class="op">=</span><span class="dv">64</span>) <span class="co"># these values were taken from [https://github.com/PRBonn/semantic-kitti-api/blob/master/auxiliary/laserscan.py]</span></span>
+<span id="cb21-2"><a href="#cb21-2" aria-hidden="true" tabindex="-1"></a>tfms <span class="op">=</span> ProjectionTransform(proj)</span>
+<span id="cb21-3"><a href="#cb21-3" aria-hidden="true" tabindex="-1"></a>ds.set_transform(tfms)</span>
+<span id="cb21-4"><a href="#cb21-4" aria-hidden="true" tabindex="-1"></a>item <span class="op">=</span> ds[<span class="dv">128</span>]</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+</div>
+<p>As we can see below, the data is still returned as numpy arrays, but their shapes have changed as follows:</p>
+<ul>
+<li><code>frame</code>: an image of HxW resolution with 5 channels with floats (i.e.&nbsp;x, y, z, reflectance, depth);</li>
+<li><code>label</code>: an image of HxW resolution with a single channel with integers;</li>
+<li><code>mask</code>: an image of HxW resolution with a single channel with booleans.</li>
+</ul>
+<p>There are a lot of pixels in these projection images that have no corresponding LiDAR readings to be projected. Hence, these pixels were filled with:</p>
+<ul>
+<li>in <code>frame</code>: array([0., 0., 0., 0., 0.])</li>
+<li>in <code>label</code>: -1</li>
+<li>in <code>mask</code>: False</li>
+</ul>
+<p>The mask image provides a convenient boolean mask to easily identify pixels with valid LiDAR readings marked as <em>True</em> and pixels with no LiDAR readings marked as <em>False</em>.</p>
+<div id="cell-27" class="cell">
+<div class="sourceCode cell-code" id="cb22"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb22-1"><a href="#cb22-1" aria-hidden="true" tabindex="-1"></a>frame_img <span class="op">=</span> item[<span class="st">'frame'</span>]</span>
+<span id="cb22-2"><a href="#cb22-2" aria-hidden="true" tabindex="-1"></a>frame_img[:<span class="dv">2</span>], frame_img.shape, frame_img.dtype</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output cell-output-display">
+<pre><code>(array([[[  0.       ,   0.       ,   0.       ,   0.       ,
+            0.       ],
+         [  0.       ,   0.       ,   0.       ,   0.       ,
+            0.       ],
+         [  0.       ,   0.       ,   0.       ,   0.       ,
+            0.       ],
+         ...,
+         [  0.       ,   0.       ,   0.       ,   0.       ,
+            0.       ],
+         [  0.       ,   0.       ,   0.       ,   0.       ,
+            0.       ],
+         [  0.       ,   0.       ,   0.       ,   0.       ,
+            0.       ]],
+ 
+        [[  0.       ,   0.       ,   0.       ,   0.       ,
+            0.       ],
+         [  0.       ,   0.       ,   0.       ,   0.       ,
+            0.       ],
+         [  0.       ,   0.       ,   0.       ,   0.       ,
+            0.       ],
+         ...,
+         [-51.240726 ,   0.7981246,   2.022291 ,   0.21     ,
+           51.286827 ],
+         [-50.624985 ,   0.3961611,   2.000314 ,   0.17     ,
+           50.66604  ],
+         [-51.28182  ,   0.2415634,   2.0237277,   0.13     ,
+           51.322304 ]]], dtype=float32),
+ (64, 1024, 5),
+ dtype('float32'))</code></pre>
+</div>
+</div>
+<div id="cell-28" class="cell">
+<div class="sourceCode cell-code" id="cb24"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb24-1"><a href="#cb24-1" aria-hidden="true" tabindex="-1"></a>label_img <span class="op">=</span> item[<span class="st">'label'</span>]</span>
+<span id="cb24-2"><a href="#cb24-2" aria-hidden="true" tabindex="-1"></a>label_img[:<span class="dv">2</span>], label_img.shape, label_img.dtype, <span class="bu">set</span>(label_img.flatten())</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output cell-output-display">
+<pre><code>(array([[-1, -1, -1, ..., -1, -1, -1],
+        [-1, -1, -1, ...,  0,  0,  0]], dtype=int32),
+ (64, 1024),
+ dtype('int32'),
+ {-1, 0, 1, 9, 11, 13, 14, 15, 16, 17, 18, 19})</code></pre>
+</div>
+</div>
+<div id="cell-29" class="cell">
+<div class="sourceCode cell-code" id="cb26"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb26-1"><a href="#cb26-1" aria-hidden="true" tabindex="-1"></a>mask_img <span class="op">=</span> item[<span class="st">'mask'</span>]</span>
+<span id="cb26-2"><a href="#cb26-2" aria-hidden="true" tabindex="-1"></a>mask_img[:<span class="dv">2</span>], mask_img.shape, mask_img.dtype</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output cell-output-display">
+<pre><code>(array([[False, False, False, ..., False, False, False],
+        [False, False, False, ..., False, False, False]]),
+ (64, 1024),
+ dtype('bool'))</code></pre>
+</div>
+</div>
+<hr>
+<p><a href="https://github.com/AIR-UFG/colorcloud/blob/main/colorcloud/behley2019iccv.py#L276" target="_blank" style="float:right; font-size:smaller">source</a></p>
+</section>
+<section id="projectionviztransform" class="level3">
+<h3 class="anchored" data-anchor-id="projectionviztransform">ProjectionVizTransform</h3>
+<blockquote class="blockquote">
+<pre><code> ProjectionVizTransform (color_map_rgb_np, learning_map_inv_np,
+                         scaling_values)</code></pre>
+</blockquote>
+<p><em>Pytorch transform to preprocess projection images for proper visualization.</em></p>
+<div id="cell-31" class="cell">
+<details open="" class="code-fold">
+<summary>Exported source</summary>
+<div class="sourceCode cell-code" id="cb29"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb29-1"><a href="#cb29-1" aria-hidden="true" tabindex="-1"></a><span class="kw">class</span> ProjectionVizTransform(nn.Module):</span>
+<span id="cb29-2"><a href="#cb29-2" aria-hidden="true" tabindex="-1"></a>    <span class="co">"Pytorch transform to preprocess projection images for proper visualization."</span></span>
+<span id="cb29-3"><a href="#cb29-3" aria-hidden="true" tabindex="-1"></a>    <span class="kw">def</span> <span class="fu">__init__</span>(<span class="va">self</span>, color_map_rgb_np, learning_map_inv_np, scaling_values):</span>
+<span id="cb29-4"><a href="#cb29-4" aria-hidden="true" tabindex="-1"></a>        <span class="bu">super</span>().<span class="fu">__init__</span>()</span>
+<span id="cb29-5"><a href="#cb29-5" aria-hidden="true" tabindex="-1"></a>        <span class="va">self</span>.color_map_rgb_np <span class="op">=</span> color_map_rgb_np</span>
+<span id="cb29-6"><a href="#cb29-6" aria-hidden="true" tabindex="-1"></a>        <span class="va">self</span>.learning_map_inv_np <span class="op">=</span> learning_map_inv_np</span>
+<span id="cb29-7"><a href="#cb29-7" aria-hidden="true" tabindex="-1"></a>        <span class="va">self</span>.scaling_values <span class="op">=</span> scaling_values</span>
+<span id="cb29-8"><a href="#cb29-8" aria-hidden="true" tabindex="-1"></a>    </span>
+<span id="cb29-9"><a href="#cb29-9" aria-hidden="true" tabindex="-1"></a>    <span class="kw">def</span> scale(<span class="va">self</span>, img, min_value, max_value):</span>
+<span id="cb29-10"><a href="#cb29-10" aria-hidden="true" tabindex="-1"></a>        <span class="cf">assert</span> img.<span class="bu">max</span>() <span class="op">&lt;=</span> max_value</span>
+<span id="cb29-11"><a href="#cb29-11" aria-hidden="true" tabindex="-1"></a>        <span class="cf">assert</span> img.<span class="bu">min</span>() <span class="op">&gt;=</span> min_value</span>
+<span id="cb29-12"><a href="#cb29-12" aria-hidden="true" tabindex="-1"></a>        <span class="cf">assert</span> max_value <span class="op">&gt;</span> min_value</span>
+<span id="cb29-13"><a href="#cb29-13" aria-hidden="true" tabindex="-1"></a>        </span>
+<span id="cb29-14"><a href="#cb29-14" aria-hidden="true" tabindex="-1"></a>        img <span class="op">=</span> img.clip(min_value, max_value)</span>
+<span id="cb29-15"><a href="#cb29-15" aria-hidden="true" tabindex="-1"></a>        <span class="cf">return</span> (<span class="fl">255.</span><span class="op">*</span>(img <span class="op">-</span> min_value)<span class="op">/</span>(max_value <span class="op">-</span> min_value)).astype(<span class="bu">int</span>)</span>
+<span id="cb29-16"><a href="#cb29-16" aria-hidden="true" tabindex="-1"></a>    </span>
+<span id="cb29-17"><a href="#cb29-17" aria-hidden="true" tabindex="-1"></a>    <span class="kw">def</span> forward(<span class="va">self</span>, item):</span>
+<span id="cb29-18"><a href="#cb29-18" aria-hidden="true" tabindex="-1"></a>        frame_img <span class="op">=</span> item[<span class="st">'frame'</span>]</span>
+<span id="cb29-19"><a href="#cb29-19" aria-hidden="true" tabindex="-1"></a>        label_img <span class="op">=</span> item[<span class="st">'label'</span>]</span>
+<span id="cb29-20"><a href="#cb29-20" aria-hidden="true" tabindex="-1"></a>        mask_img <span class="op">=</span> item[<span class="st">'mask'</span>]</span>
+<span id="cb29-21"><a href="#cb29-21" aria-hidden="true" tabindex="-1"></a>        </span>
+<span id="cb29-22"><a href="#cb29-22" aria-hidden="true" tabindex="-1"></a>        normalized_frame_img <span class="op">=</span> <span class="va">None</span></span>
+<span id="cb29-23"><a href="#cb29-23" aria-hidden="true" tabindex="-1"></a>        <span class="cf">if</span> frame_img <span class="kw">is</span> <span class="kw">not</span> <span class="va">None</span>:</span>
+<span id="cb29-24"><a href="#cb29-24" aria-hidden="true" tabindex="-1"></a>            x <span class="op">=</span> <span class="va">self</span>.scale(frame_img[:,:,<span class="dv">0</span>], <span class="va">self</span>.scaling_values[<span class="st">"x"</span>][<span class="st">"min"</span>], <span class="va">self</span>.scaling_values[<span class="st">"x"</span>][<span class="st">"max"</span>])</span>
+<span id="cb29-25"><a href="#cb29-25" aria-hidden="true" tabindex="-1"></a>            y <span class="op">=</span> <span class="va">self</span>.scale(frame_img[:,:,<span class="dv">1</span>], <span class="va">self</span>.scaling_values[<span class="st">"y"</span>][<span class="st">"min"</span>], <span class="va">self</span>.scaling_values[<span class="st">"y"</span>][<span class="st">"max"</span>])</span>
+<span id="cb29-26"><a href="#cb29-26" aria-hidden="true" tabindex="-1"></a>            z <span class="op">=</span> <span class="va">self</span>.scale(frame_img[:,:,<span class="dv">2</span>], <span class="va">self</span>.scaling_values[<span class="st">"z"</span>][<span class="st">"min"</span>], <span class="va">self</span>.scaling_values[<span class="st">"z"</span>][<span class="st">"max"</span>])</span>
+<span id="cb29-27"><a href="#cb29-27" aria-hidden="true" tabindex="-1"></a>            r <span class="op">=</span> <span class="va">self</span>.scale(frame_img[:,:,<span class="dv">3</span>], <span class="va">self</span>.scaling_values[<span class="st">"r"</span>][<span class="st">"min"</span>], <span class="va">self</span>.scaling_values[<span class="st">"r"</span>][<span class="st">"max"</span>])</span>
+<span id="cb29-28"><a href="#cb29-28" aria-hidden="true" tabindex="-1"></a>            d <span class="op">=</span> <span class="va">self</span>.scale(frame_img[:,:,<span class="dv">4</span>], <span class="va">self</span>.scaling_values[<span class="st">"d"</span>][<span class="st">"min"</span>], <span class="va">self</span>.scaling_values[<span class="st">"d"</span>][<span class="st">"max"</span>])</span>
+<span id="cb29-29"><a href="#cb29-29" aria-hidden="true" tabindex="-1"></a>            normalized_frame_img <span class="op">=</span> np.stack((x, y, z, r, d), axis<span class="op">=-</span><span class="dv">1</span>)</span>
+<span id="cb29-30"><a href="#cb29-30" aria-hidden="true" tabindex="-1"></a>            normalized_frame_img[mask_img <span class="op">==</span> <span class="va">False</span>] <span class="op">*=</span> <span class="dv">0</span></span>
+<span id="cb29-31"><a href="#cb29-31" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb29-32"><a href="#cb29-32" aria-hidden="true" tabindex="-1"></a>        colored_label_img <span class="op">=</span> <span class="va">None</span></span>
+<span id="cb29-33"><a href="#cb29-33" aria-hidden="true" tabindex="-1"></a>        <span class="cf">if</span> label_img <span class="kw">is</span> <span class="kw">not</span> <span class="va">None</span>:</span>
+<span id="cb29-34"><a href="#cb29-34" aria-hidden="true" tabindex="-1"></a>            label_img[mask_img] <span class="op">=</span> <span class="va">self</span>.learning_map_inv_np[label_img[mask_img]]</span>
+<span id="cb29-35"><a href="#cb29-35" aria-hidden="true" tabindex="-1"></a>            colored_label_img <span class="op">=</span> np.zeros(label_img.shape <span class="op">+</span> (<span class="dv">3</span>,))</span>
+<span id="cb29-36"><a href="#cb29-36" aria-hidden="true" tabindex="-1"></a>            colored_label_img[mask_img] <span class="op">=</span> <span class="va">self</span>.color_map_rgb_np[label_img[mask_img]]</span>
+<span id="cb29-37"><a href="#cb29-37" aria-hidden="true" tabindex="-1"></a>            colored_label_img <span class="op">=</span> colored_label_img.astype(<span class="bu">int</span>)</span>
+<span id="cb29-38"><a href="#cb29-38" aria-hidden="true" tabindex="-1"></a>        </span>
+<span id="cb29-39"><a href="#cb29-39" aria-hidden="true" tabindex="-1"></a>        item <span class="op">=</span> {</span>
+<span id="cb29-40"><a href="#cb29-40" aria-hidden="true" tabindex="-1"></a>            <span class="st">'frame'</span>: normalized_frame_img,</span>
+<span id="cb29-41"><a href="#cb29-41" aria-hidden="true" tabindex="-1"></a>            <span class="st">'label'</span>: colored_label_img,</span>
+<span id="cb29-42"><a href="#cb29-42" aria-hidden="true" tabindex="-1"></a>            <span class="st">'mask'</span>: mask_img,</span>
+<span id="cb29-43"><a href="#cb29-43" aria-hidden="true" tabindex="-1"></a>        }</span>
+<span id="cb29-44"><a href="#cb29-44" aria-hidden="true" tabindex="-1"></a>        <span class="cf">return</span> item</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+</details>
+</div>
+<p>In order to plot comparable visualizations of the projections, we need to standardize the scale of the float channels from the frame projection and map the label integers to their corresponding RGB color defined in the <code>color_map</code> dict from the yaml file that was downloaded before.</p>
+<p>After experimenting with several samples from the dataset, the scale values in the table below were found to produce reasonable results. If you are using a dataset other than SemanticKITTI, these values may need to be adjusted accordingly.</p>
+<table class="caption-top table">
+<thead>
+<tr class="header">
+<th>Feature</th>
+<th>Min</th>
+<th>Max</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td><strong>x</strong></td>
+<td>-100.0</td>
+<td>100.0</td>
+</tr>
+<tr class="even">
+<td><strong>y</strong></td>
+<td>-100.0</td>
+<td>100.0</td>
+</tr>
+<tr class="odd">
+<td><strong>z</strong></td>
+<td>-31.0</td>
+<td>5.0</td>
+</tr>
+<tr class="even">
+<td><strong>r</strong></td>
+<td>0.0</td>
+<td>1.0</td>
+</tr>
+<tr class="odd">
+<td><strong>d</strong></td>
+<td>0.0</td>
+<td>100.0</td>
+</tr>
+</tbody>
+</table>
+<p>Here is an example on how to use and compose the previous transforms with the <code>torchvision.transforms.v2</code> module, and then visualize the resulting images with the <code>matplolib.pyplot</code> module:</p>
+<hr>
+<p><a href="https://github.com/AIR-UFG/colorcloud/blob/main/colorcloud/behley2019iccv.py#L322" target="_blank" style="float:right; font-size:smaller">source</a></p>
+</section>
+<section id="plot_projections" class="level3">
+<h3 class="anchored" data-anchor-id="plot_projections">plot_projections</h3>
+<blockquote class="blockquote">
+<pre><code> plot_projections (img, label, channels_names)</code></pre>
+</blockquote>
+<div id="cell-34" class="cell">
+<details open="" class="code-fold">
+<summary>Exported source</summary>
+<div class="sourceCode cell-code" id="cb31"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb31-1"><a href="#cb31-1" aria-hidden="true" tabindex="-1"></a><span class="kw">def</span> plot_projections(img, label, channels_names):</span>
+<span id="cb31-2"><a href="#cb31-2" aria-hidden="true" tabindex="-1"></a>    <span class="cf">assert</span> <span class="bu">len</span>(channels_names) <span class="op">==</span> img.shape[<span class="op">-</span><span class="dv">1</span>]</span>
+<span id="cb31-3"><a href="#cb31-3" aria-hidden="true" tabindex="-1"></a>    channels <span class="op">=</span> [img[:,:,i] <span class="cf">for</span> i <span class="kw">in</span> <span class="bu">range</span>(<span class="bu">len</span>(channels_names))]</span>
+<span id="cb31-4"><a href="#cb31-4" aria-hidden="true" tabindex="-1"></a>    <span class="cf">if</span> label <span class="kw">is</span> <span class="kw">not</span> <span class="va">None</span>:</span>
+<span id="cb31-5"><a href="#cb31-5" aria-hidden="true" tabindex="-1"></a>        channels_names.append(<span class="st">'label'</span>)</span>
+<span id="cb31-6"><a href="#cb31-6" aria-hidden="true" tabindex="-1"></a>        channels.append(label)</span>
+<span id="cb31-7"><a href="#cb31-7" aria-hidden="true" tabindex="-1"></a>    fig, axs <span class="op">=</span> plt.subplots(<span class="bu">len</span>(channels_names), <span class="dv">1</span>, figsize<span class="op">=</span>(<span class="dv">20</span>,<span class="dv">10</span>), layout<span class="op">=</span><span class="st">'compressed'</span>)</span>
+<span id="cb31-8"><a href="#cb31-8" aria-hidden="true" tabindex="-1"></a>    <span class="cf">for</span> ax, channel, title <span class="kw">in</span> <span class="bu">zip</span>(axs, channels, channels_names):</span>
+<span id="cb31-9"><a href="#cb31-9" aria-hidden="true" tabindex="-1"></a>        ax.imshow(channel)</span>
+<span id="cb31-10"><a href="#cb31-10" aria-hidden="true" tabindex="-1"></a>        ax.set_title(title)</span>
+<span id="cb31-11"><a href="#cb31-11" aria-hidden="true" tabindex="-1"></a>        ax.axis(<span class="st">'off'</span>)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+</details>
+</div>
+<div id="cell-35" class="cell">
+<div class="sourceCode cell-code" id="cb32"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb32-1"><a href="#cb32-1" aria-hidden="true" tabindex="-1"></a>proj <span class="op">=</span> SphericalProjection(fov_up_deg<span class="op">=</span><span class="fl">3.</span>, fov_down_deg<span class="op">=-</span><span class="fl">25.</span>, W<span class="op">=</span><span class="dv">1024</span>, H<span class="op">=</span><span class="dv">64</span>) <span class="co"># these values were taken from [https://github.com/PRBonn/semantic-kitti-api/blob/master/auxiliary/laserscan.py]</span></span>
+<span id="cb32-2"><a href="#cb32-2" aria-hidden="true" tabindex="-1"></a>scaling_values <span class="op">=</span> {</span>
+<span id="cb32-3"><a href="#cb32-3" aria-hidden="true" tabindex="-1"></a>    <span class="st">"x"</span> : {<span class="st">"min"</span>: <span class="op">-</span><span class="fl">100.</span>, <span class="st">"max"</span>:<span class="fl">100.</span>},</span>
+<span id="cb32-4"><a href="#cb32-4" aria-hidden="true" tabindex="-1"></a>    <span class="st">"y"</span> : {<span class="st">"min"</span>: <span class="op">-</span><span class="fl">100.</span>, <span class="st">"max"</span>:<span class="fl">100.</span>},</span>
+<span id="cb32-5"><a href="#cb32-5" aria-hidden="true" tabindex="-1"></a>    <span class="st">"z"</span> : {<span class="st">"min"</span>: <span class="op">-</span><span class="fl">31.</span>, <span class="st">"max"</span>:<span class="fl">5.</span>},</span>
+<span id="cb32-6"><a href="#cb32-6" aria-hidden="true" tabindex="-1"></a>    <span class="st">"r"</span> : {<span class="st">"min"</span>: <span class="fl">0.</span>, <span class="st">"max"</span>:<span class="fl">1.</span>},</span>
+<span id="cb32-7"><a href="#cb32-7" aria-hidden="true" tabindex="-1"></a>    <span class="st">"d"</span> : {<span class="st">"min"</span>: <span class="fl">0.</span>, <span class="st">"max"</span>:<span class="fl">100.</span>}</span>
+<span id="cb32-8"><a href="#cb32-8" aria-hidden="true" tabindex="-1"></a>}</span>
+<span id="cb32-9"><a href="#cb32-9" aria-hidden="true" tabindex="-1"></a>tfms <span class="op">=</span> v2.Compose([</span>
+<span id="cb32-10"><a href="#cb32-10" aria-hidden="true" tabindex="-1"></a>    ProjectionTransform(proj),</span>
+<span id="cb32-11"><a href="#cb32-11" aria-hidden="true" tabindex="-1"></a>    ProjectionVizTransform(ds.color_map_rgb_np, ds.learning_map_inv_np, scaling_values),</span>
+<span id="cb32-12"><a href="#cb32-12" aria-hidden="true" tabindex="-1"></a>])</span>
+<span id="cb32-13"><a href="#cb32-13" aria-hidden="true" tabindex="-1"></a>ds.set_transform(tfms)</span>
+<span id="cb32-14"><a href="#cb32-14" aria-hidden="true" tabindex="-1"></a>item <span class="op">=</span> ds[<span class="dv">128</span>]</span>
+<span id="cb32-15"><a href="#cb32-15" aria-hidden="true" tabindex="-1"></a>img <span class="op">=</span> item[<span class="st">'frame'</span>]</span>
+<span id="cb32-16"><a href="#cb32-16" aria-hidden="true" tabindex="-1"></a>label <span class="op">=</span> item[<span class="st">'label'</span>]</span>
+<span id="cb32-17"><a href="#cb32-17" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb32-18"><a href="#cb32-18" aria-hidden="true" tabindex="-1"></a>plot_projections(img, label, [<span class="st">'x'</span>, <span class="st">'y'</span>, <span class="st">'z'</span>, <span class="st">'r'</span>, <span class="st">'d'</span>])</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output cell-output-display">
+<div>
+<figure class="figure">
+<p><img src="00_behley2019iccv_files/figure-html/cell-25-output-1.png" class="img-fluid figure-img"></p>
+</figure>
+</div>
+</div>
+</div>
+<div id="cell-36" class="cell">
+<div class="sourceCode cell-code" id="cb33"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb33-1"><a href="#cb33-1" aria-hidden="true" tabindex="-1"></a>proj <span class="op">=</span> UnfoldingProjection(W<span class="op">=</span><span class="dv">1024</span>, H<span class="op">=</span><span class="dv">64</span>)</span>
+<span id="cb33-2"><a href="#cb33-2" aria-hidden="true" tabindex="-1"></a>scaling_values <span class="op">=</span> {</span>
+<span id="cb33-3"><a href="#cb33-3" aria-hidden="true" tabindex="-1"></a>    <span class="st">"x"</span> : {<span class="st">"min"</span>: <span class="op">-</span><span class="fl">100.</span>, <span class="st">"max"</span>:<span class="fl">100.</span>},</span>
+<span id="cb33-4"><a href="#cb33-4" aria-hidden="true" tabindex="-1"></a>    <span class="st">"y"</span> : {<span class="st">"min"</span>: <span class="op">-</span><span class="fl">100.</span>, <span class="st">"max"</span>:<span class="fl">100.</span>},</span>
+<span id="cb33-5"><a href="#cb33-5" aria-hidden="true" tabindex="-1"></a>    <span class="st">"z"</span> : {<span class="st">"min"</span>: <span class="op">-</span><span class="fl">31.</span>, <span class="st">"max"</span>:<span class="fl">5.</span>},</span>
+<span id="cb33-6"><a href="#cb33-6" aria-hidden="true" tabindex="-1"></a>    <span class="st">"r"</span> : {<span class="st">"min"</span>: <span class="fl">0.</span>, <span class="st">"max"</span>:<span class="fl">1.</span>},</span>
+<span id="cb33-7"><a href="#cb33-7" aria-hidden="true" tabindex="-1"></a>    <span class="st">"d"</span> : {<span class="st">"min"</span>: <span class="fl">0.</span>, <span class="st">"max"</span>:<span class="fl">100.</span>}</span>
+<span id="cb33-8"><a href="#cb33-8" aria-hidden="true" tabindex="-1"></a>}</span>
+<span id="cb33-9"><a href="#cb33-9" aria-hidden="true" tabindex="-1"></a>tfms <span class="op">=</span> v2.Compose([</span>
+<span id="cb33-10"><a href="#cb33-10" aria-hidden="true" tabindex="-1"></a>    ProjectionTransform(proj),</span>
+<span id="cb33-11"><a href="#cb33-11" aria-hidden="true" tabindex="-1"></a>    ProjectionVizTransform(ds.color_map_rgb_np, ds.learning_map_inv_np, scaling_values),</span>
+<span id="cb33-12"><a href="#cb33-12" aria-hidden="true" tabindex="-1"></a>])</span>
+<span id="cb33-13"><a href="#cb33-13" aria-hidden="true" tabindex="-1"></a>ds.set_transform(tfms)</span>
+<span id="cb33-14"><a href="#cb33-14" aria-hidden="true" tabindex="-1"></a>item <span class="op">=</span> ds[<span class="dv">128</span>]</span>
+<span id="cb33-15"><a href="#cb33-15" aria-hidden="true" tabindex="-1"></a>img <span class="op">=</span> item[<span class="st">'frame'</span>]</span>
+<span id="cb33-16"><a href="#cb33-16" aria-hidden="true" tabindex="-1"></a>label <span class="op">=</span> item[<span class="st">'label'</span>]</span>
+<span id="cb33-17"><a href="#cb33-17" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb33-18"><a href="#cb33-18" aria-hidden="true" tabindex="-1"></a>plot_projections(img, label, [<span class="st">'x'</span>, <span class="st">'y'</span>, <span class="st">'z'</span>, <span class="st">'r'</span>, <span class="st">'d'</span>])</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output cell-output-display">
+<div>
+<figure class="figure">
+<p><img src="00_behley2019iccv_files/figure-html/cell-26-output-1.png" class="img-fluid figure-img"></p>
+</figure>
+</div>
+</div>
+</div>
+<p>In the next cell, we can see how long it takes on average to sample an item from this dataset class.</p>
+<div id="cell-38" class="cell">
+<div class="sourceCode cell-code" id="cb34"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output cell-output-stdout">
+<pre><code>12.8 ms ± 373 µs per loop (mean ± std. dev. of 7 runs, 100 loops each)</code></pre>
+</div>
+</div>
+<hr>
+<p><a href="https://github.com/AIR-UFG/colorcloud/blob/main/colorcloud/behley2019iccv.py#L335" target="_blank" style="float:right; font-size:smaller">source</a></p>
+</section>
+<section id="projectiontotensortransform" class="level3">
+<h3 class="anchored" data-anchor-id="projectiontotensortransform">ProjectionToTensorTransform</h3>
+<blockquote class="blockquote">
+<pre><code> ProjectionToTensorTransform (*args, **kwargs)</code></pre>
+</blockquote>
+<p><em>Pytorch transform that converts the projections from np.array to torch.tensor. It also changes the frame image format from (H, W, C) to (C, H, W).</em></p>
+<div id="cell-40" class="cell">
+<details open="" class="code-fold">
+<summary>Exported source</summary>
+<div class="sourceCode cell-code" id="cb37"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb37-1"><a href="#cb37-1" aria-hidden="true" tabindex="-1"></a><span class="kw">class</span> ProjectionToTensorTransform(nn.Module):</span>
+<span id="cb37-2"><a href="#cb37-2" aria-hidden="true" tabindex="-1"></a>    <span class="co">"Pytorch transform that converts the projections from np.array to torch.tensor. It also changes the frame image format from (H, W, C) to (C, H, W)."</span></span>
+<span id="cb37-3"><a href="#cb37-3" aria-hidden="true" tabindex="-1"></a>    <span class="kw">def</span> forward(<span class="va">self</span>, item):</span>
+<span id="cb37-4"><a href="#cb37-4" aria-hidden="true" tabindex="-1"></a>        frame_img <span class="op">=</span> item[<span class="st">'frame'</span>]</span>
+<span id="cb37-5"><a href="#cb37-5" aria-hidden="true" tabindex="-1"></a>        label_img <span class="op">=</span> item[<span class="st">'label'</span>]</span>
+<span id="cb37-6"><a href="#cb37-6" aria-hidden="true" tabindex="-1"></a>        mask_img <span class="op">=</span> item[<span class="st">'mask'</span>]</span>
+<span id="cb37-7"><a href="#cb37-7" aria-hidden="true" tabindex="-1"></a>        </span>
+<span id="cb37-8"><a href="#cb37-8" aria-hidden="true" tabindex="-1"></a>        frame_img <span class="op">=</span> np.transpose(frame_img, (<span class="dv">2</span>, <span class="dv">0</span>, <span class="dv">1</span>))</span>
+<span id="cb37-9"><a href="#cb37-9" aria-hidden="true" tabindex="-1"></a>        frame_img <span class="op">=</span> torch.from_numpy(frame_img).<span class="bu">float</span>()</span>
+<span id="cb37-10"><a href="#cb37-10" aria-hidden="true" tabindex="-1"></a>        <span class="cf">if</span> label_img <span class="kw">is</span> <span class="kw">not</span> <span class="va">None</span>:</span>
+<span id="cb37-11"><a href="#cb37-11" aria-hidden="true" tabindex="-1"></a>            label_img <span class="op">=</span> torch.from_numpy(label_img).<span class="bu">long</span>()</span>
+<span id="cb37-12"><a href="#cb37-12" aria-hidden="true" tabindex="-1"></a>        <span class="cf">if</span> mask_img <span class="kw">is</span> <span class="kw">not</span> <span class="va">None</span>:</span>
+<span id="cb37-13"><a href="#cb37-13" aria-hidden="true" tabindex="-1"></a>            mask_img <span class="op">=</span> torch.from_numpy(mask_img)</span>
+<span id="cb37-14"><a href="#cb37-14" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb37-15"><a href="#cb37-15" aria-hidden="true" tabindex="-1"></a>        item <span class="op">=</span> {</span>
+<span id="cb37-16"><a href="#cb37-16" aria-hidden="true" tabindex="-1"></a>            <span class="st">'frame'</span>: frame_img,</span>
+<span id="cb37-17"><a href="#cb37-17" aria-hidden="true" tabindex="-1"></a>            <span class="st">'label'</span>: label_img,</span>
+<span id="cb37-18"><a href="#cb37-18" aria-hidden="true" tabindex="-1"></a>            <span class="st">'mask'</span>: mask_img,</span>
+<span id="cb37-19"><a href="#cb37-19" aria-hidden="true" tabindex="-1"></a>        }</span>
+<span id="cb37-20"><a href="#cb37-20" aria-hidden="true" tabindex="-1"></a>        <span class="cf">return</span> item</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+</details>
+</div>
+<p>In order to use the dataset to train pytorch models, it is necessary to transform the data from <code>np.array</code>s to <code>torch.tensor</code>s. Also, for the frame images, it is necessary to transpose (or permute in torch lingo) its axis from <em>channels last</em> (H, W, C) to <em>channels first</em> (C, H, W).</p>
+<p>Here is an example on how to use it with the scan unfolding projection:</p>
+<div id="cell-42" class="cell">
+<div class="sourceCode cell-code" id="cb38"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb38-1"><a href="#cb38-1" aria-hidden="true" tabindex="-1"></a>proj <span class="op">=</span> UnfoldingProjection(W<span class="op">=</span><span class="dv">1024</span>, H<span class="op">=</span><span class="dv">64</span>)</span>
+<span id="cb38-2"><a href="#cb38-2" aria-hidden="true" tabindex="-1"></a>tfms <span class="op">=</span> v2.Compose([</span>
+<span id="cb38-3"><a href="#cb38-3" aria-hidden="true" tabindex="-1"></a>    ProjectionTransform(proj),</span>
+<span id="cb38-4"><a href="#cb38-4" aria-hidden="true" tabindex="-1"></a>    ProjectionToTensorTransform(),</span>
+<span id="cb38-5"><a href="#cb38-5" aria-hidden="true" tabindex="-1"></a>])</span>
+<span id="cb38-6"><a href="#cb38-6" aria-hidden="true" tabindex="-1"></a>ds.set_transform(tfms)</span>
+<span id="cb38-7"><a href="#cb38-7" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb38-8"><a href="#cb38-8" aria-hidden="true" tabindex="-1"></a>item <span class="op">=</span> ds[<span class="dv">0</span>]</span>
+<span id="cb38-9"><a href="#cb38-9" aria-hidden="true" tabindex="-1"></a>img <span class="op">=</span> item[<span class="st">'frame'</span>]</span>
+<span id="cb38-10"><a href="#cb38-10" aria-hidden="true" tabindex="-1"></a>label <span class="op">=</span> item[<span class="st">'label'</span>]</span>
+<span id="cb38-11"><a href="#cb38-11" aria-hidden="true" tabindex="-1"></a>mask <span class="op">=</span> item[<span class="st">'mask'</span>]</span>
+<span id="cb38-12"><a href="#cb38-12" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb38-13"><a href="#cb38-13" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(img.shape, img.<span class="bu">type</span>())</span>
+<span id="cb38-14"><a href="#cb38-14" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(label.shape, label.<span class="bu">type</span>())</span>
+<span id="cb38-15"><a href="#cb38-15" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(mask.shape, mask.<span class="bu">type</span>())</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output cell-output-stdout">
+<pre><code>torch.Size([5, 64, 1024]) torch.FloatTensor
+torch.Size([64, 1024]) torch.LongTensor
+torch.Size([64, 1024]) torch.BoolTensor</code></pre>
+</div>
+</div>
+<p>Here is an example on how to combine the classes above to implement a <code>torch.utils.data.Dataloader</code> that iterates on batches of frame, label, mask and weight images:</p>
+<div id="cell-44" class="cell">
+<div class="sourceCode cell-code" id="cb40"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb40-1"><a href="#cb40-1" aria-hidden="true" tabindex="-1"></a>bs <span class="op">=</span> <span class="dv">10</span></span>
+<span id="cb40-2"><a href="#cb40-2" aria-hidden="true" tabindex="-1"></a>dl <span class="op">=</span> DataLoader(ds, bs, num_workers<span class="op">=</span><span class="dv">8</span>)</span>
+<span id="cb40-3"><a href="#cb40-3" aria-hidden="true" tabindex="-1"></a><span class="cf">for</span> batch <span class="kw">in</span> dl:</span>
+<span id="cb40-4"><a href="#cb40-4" aria-hidden="true" tabindex="-1"></a>    item <span class="op">=</span> batch</span>
+<span id="cb40-5"><a href="#cb40-5" aria-hidden="true" tabindex="-1"></a>    img <span class="op">=</span> item[<span class="st">'frame'</span>]</span>
+<span id="cb40-6"><a href="#cb40-6" aria-hidden="true" tabindex="-1"></a>    label <span class="op">=</span> item[<span class="st">'label'</span>]</span>
+<span id="cb40-7"><a href="#cb40-7" aria-hidden="true" tabindex="-1"></a>    mask <span class="op">=</span> item[<span class="st">'mask'</span>]</span>
+<span id="cb40-8"><a href="#cb40-8" aria-hidden="true" tabindex="-1"></a>    <span class="bu">print</span>(<span class="ss">f"Shape of img </span><span class="ch">\t</span><span class="ss"> [N, C, H, W]: </span><span class="ch">\t</span><span class="ss"> </span><span class="sc">{</span>img<span class="sc">.</span>shape<span class="sc">}</span><span class="ss">"</span>)</span>
+<span id="cb40-9"><a href="#cb40-9" aria-hidden="true" tabindex="-1"></a>    <span class="bu">print</span>(<span class="ss">f"Shape of label </span><span class="ch">\t</span><span class="ss"> [N, H, W]: </span><span class="ch">\t</span><span class="ss"> </span><span class="sc">{</span>label<span class="sc">.</span>shape<span class="sc">}</span><span class="ss">"</span>)</span>
+<span id="cb40-10"><a href="#cb40-10" aria-hidden="true" tabindex="-1"></a>    <span class="bu">print</span>(<span class="ss">f"Shape of mask </span><span class="ch">\t</span><span class="ss"> [N, H, W]: </span><span class="ch">\t</span><span class="ss"> </span><span class="sc">{</span>mask<span class="sc">.</span>shape<span class="sc">}</span><span class="ss">"</span>)</span>
+<span id="cb40-11"><a href="#cb40-11" aria-hidden="true" tabindex="-1"></a>    <span class="cf">break</span></span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output cell-output-stdout">
+<pre><code>Shape of img     [N, C, H, W]:   torch.Size([10, 5, 64, 1024])
+Shape of label   [N, H, W]:      torch.Size([10, 64, 1024])
+Shape of mask    [N, H, W]:      torch.Size([10, 64, 1024])</code></pre>
+</div>
+</div>
+<p>In the next cell, we can see how long it takes on average to iterate the dataloader for 1 epoch.</p>
+<div id="cell-46" class="cell">
+<div class="sourceCode cell-code" id="cb42"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb42-1"><a href="#cb42-1" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> tqdm.auto <span class="im">import</span> tqdm</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+</div>
+<div id="cell-47" class="cell">
+<div class="sourceCode cell-code" id="cb43"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb43-1"><a href="#cb43-1" aria-hidden="true" tabindex="-1"></a><span class="cf">for</span> batch <span class="kw">in</span> tqdm(dl):</span>
+<span id="cb43-2"><a href="#cb43-2" aria-hidden="true" tabindex="-1"></a>    item <span class="op">=</span> batch</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output cell-output-display">
+<script type="application/vnd.jupyter.widget-view+json">
+{"model_id":"770b3eb35c084bbcb636a1c2cc711642","version_major":2,"version_minor":0,"quarto_mimetype":"application/vnd.jupyter.widget-view+json"}
+</script>
+</div>
+</div>
+</section>
+</section>
+<section id="remapping-the-labels" class="level2">
+<h2 class="anchored" data-anchor-id="remapping-the-labels">Remapping the labels</h2>
+<p>The paper <a href="https://arxiv.org/pdf/2006.05518">MVLidarNet: Real-Time Multi-Class Scene Understanding for Autonomous Driving Using Multiple Views</a> proposes a different mapping of the labels for training than the one proposed by the yaml in the semantic-kitti-api. They only use the following 7 classes:</p>
+<ul>
+<li>car</li>
+<li>truck</li>
+<li>person/pedestrians</li>
+<li>cyclist</li>
+<li>road</li>
+<li>sidewalk</li>
+</ul>
+<p>From the <a href="https://github.com/PRBonn/semantic-kitti-api/blob/master/config/semantic-kitti.yaml">preferred yaml file</a>, we can use the following remapping rules dictionary and the method <code>learning.remap</code> from the dataset to apply the remapping:</p>
+<div id="cell-49" class="cell">
+<div class="sourceCode cell-code" id="cb44"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb44-1"><a href="#cb44-1" aria-hidden="true" tabindex="-1"></a>remapping_rules <span class="op">=</span> {</span>
+<span id="cb44-2"><a href="#cb44-2" aria-hidden="true" tabindex="-1"></a>    <span class="dv">1</span>: <span class="dv">1</span>,</span>
+<span id="cb44-3"><a href="#cb44-3" aria-hidden="true" tabindex="-1"></a>    <span class="dv">4</span>: <span class="dv">2</span>,</span>
+<span id="cb44-4"><a href="#cb44-4" aria-hidden="true" tabindex="-1"></a>    <span class="dv">6</span>: <span class="dv">3</span>,</span>
+<span id="cb44-5"><a href="#cb44-5" aria-hidden="true" tabindex="-1"></a>    <span class="dv">7</span>: <span class="dv">4</span>,</span>
+<span id="cb44-6"><a href="#cb44-6" aria-hidden="true" tabindex="-1"></a>    <span class="dv">2</span>: <span class="dv">4</span>,</span>
+<span id="cb44-7"><a href="#cb44-7" aria-hidden="true" tabindex="-1"></a>    <span class="dv">9</span>: <span class="dv">5</span>,</span>
+<span id="cb44-8"><a href="#cb44-8" aria-hidden="true" tabindex="-1"></a>    <span class="dv">11</span>: <span class="dv">6</span></span>
+<span id="cb44-9"><a href="#cb44-9" aria-hidden="true" tabindex="-1"></a>}</span>
+<span id="cb44-10"><a href="#cb44-10" aria-hidden="true" tabindex="-1"></a>ds.learning_remap(remapping_rules)</span>
+<span id="cb44-11"><a href="#cb44-11" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb44-12"><a href="#cb44-12" aria-hidden="true" tabindex="-1"></a>scaling_values <span class="op">=</span> {</span>
+<span id="cb44-13"><a href="#cb44-13" aria-hidden="true" tabindex="-1"></a>    <span class="st">"x"</span> : {<span class="st">"min"</span>: <span class="op">-</span><span class="fl">100.</span>, <span class="st">"max"</span>:<span class="fl">100.</span>},</span>
+<span id="cb44-14"><a href="#cb44-14" aria-hidden="true" tabindex="-1"></a>    <span class="st">"y"</span> : {<span class="st">"min"</span>: <span class="op">-</span><span class="fl">100.</span>, <span class="st">"max"</span>:<span class="fl">100.</span>},</span>
+<span id="cb44-15"><a href="#cb44-15" aria-hidden="true" tabindex="-1"></a>    <span class="st">"z"</span> : {<span class="st">"min"</span>: <span class="op">-</span><span class="fl">31.</span>, <span class="st">"max"</span>:<span class="fl">5.</span>},</span>
+<span id="cb44-16"><a href="#cb44-16" aria-hidden="true" tabindex="-1"></a>    <span class="st">"r"</span> : {<span class="st">"min"</span>: <span class="fl">0.</span>, <span class="st">"max"</span>:<span class="fl">1.</span>},</span>
+<span id="cb44-17"><a href="#cb44-17" aria-hidden="true" tabindex="-1"></a>    <span class="st">"d"</span> : {<span class="st">"min"</span>: <span class="fl">0.</span>, <span class="st">"max"</span>:<span class="fl">100.</span>}</span>
+<span id="cb44-18"><a href="#cb44-18" aria-hidden="true" tabindex="-1"></a>}</span>
+<span id="cb44-19"><a href="#cb44-19" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb44-20"><a href="#cb44-20" aria-hidden="true" tabindex="-1"></a>tfms <span class="op">=</span> v2.Compose([</span>
+<span id="cb44-21"><a href="#cb44-21" aria-hidden="true" tabindex="-1"></a>    ProjectionTransform(proj),</span>
+<span id="cb44-22"><a href="#cb44-22" aria-hidden="true" tabindex="-1"></a>    ProjectionVizTransform(ds.color_map_rgb_np, ds.learning_map_inv_np, scaling_values),</span>
+<span id="cb44-23"><a href="#cb44-23" aria-hidden="true" tabindex="-1"></a>])</span>
+<span id="cb44-24"><a href="#cb44-24" aria-hidden="true" tabindex="-1"></a>ds.set_transform(tfms)</span>
+<span id="cb44-25"><a href="#cb44-25" aria-hidden="true" tabindex="-1"></a>item <span class="op">=</span> ds[<span class="dv">128</span>]</span>
+<span id="cb44-26"><a href="#cb44-26" aria-hidden="true" tabindex="-1"></a>img <span class="op">=</span> item[<span class="st">'frame'</span>]</span>
+<span id="cb44-27"><a href="#cb44-27" aria-hidden="true" tabindex="-1"></a>label <span class="op">=</span> item[<span class="st">'label'</span>]</span>
+<span id="cb44-28"><a href="#cb44-28" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb44-29"><a href="#cb44-29" aria-hidden="true" tabindex="-1"></a>plot_projections(img, label, [<span class="st">'x'</span>, <span class="st">'y'</span>, <span class="st">'z'</span>, <span class="st">'r'</span>, <span class="st">'d'</span>])</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output cell-output-display">
+<div>
+<figure class="figure">
+<p><img src="00_behley2019iccv_files/figure-html/cell-34-output-1.png" class="img-fluid figure-img"></p>
+</figure>
+</div>
+</div>
+</div>
+</section>
+<section id="exploratory-data-analysis-eda" class="level2">
+<h2 class="anchored" data-anchor-id="exploratory-data-analysis-eda">Exploratory Data Analysis (EDA)</h2>
+<p>During training, we noticed some samples had significant portions of their projection images missing. We plotted an example of such image in the next cell.</p>
+<div id="cell-51" class="cell">
+<div class="sourceCode cell-code" id="cb45"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb45-1"><a href="#cb45-1" aria-hidden="true" tabindex="-1"></a>ds <span class="op">=</span> SemanticKITTIDataset(data_path)</span>
+<span id="cb45-2"><a href="#cb45-2" aria-hidden="true" tabindex="-1"></a>proj <span class="op">=</span> UnfoldingProjection(W<span class="op">=</span><span class="dv">1024</span>, H<span class="op">=</span><span class="dv">64</span>)</span>
+<span id="cb45-3"><a href="#cb45-3" aria-hidden="true" tabindex="-1"></a>tfm <span class="op">=</span> ProjectionTransform(proj)</span>
+<span id="cb45-4"><a href="#cb45-4" aria-hidden="true" tabindex="-1"></a>ds.set_transform(tfm)</span>
+<span id="cb45-5"><a href="#cb45-5" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb45-6"><a href="#cb45-6" aria-hidden="true" tabindex="-1"></a>bs <span class="op">=</span> <span class="dv">1000</span></span>
+<span id="cb45-7"><a href="#cb45-7" aria-hidden="true" tabindex="-1"></a>dl <span class="op">=</span> DataLoader(ds, bs)</span>
+<span id="cb45-8"><a href="#cb45-8" aria-hidden="true" tabindex="-1"></a>item <span class="op">=</span> <span class="bu">next</span>(<span class="bu">iter</span>(dl))</span>
+<span id="cb45-9"><a href="#cb45-9" aria-hidden="true" tabindex="-1"></a>img <span class="op">=</span> item[<span class="st">'frame'</span>]</span>
+<span id="cb45-10"><a href="#cb45-10" aria-hidden="true" tabindex="-1"></a>label <span class="op">=</span> item[<span class="st">'label'</span>]</span>
+<span id="cb45-11"><a href="#cb45-11" aria-hidden="true" tabindex="-1"></a>mask <span class="op">=</span> item[<span class="st">'mask'</span>]</span>
+<span id="cb45-12"><a href="#cb45-12" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb45-13"><a href="#cb45-13" aria-hidden="true" tabindex="-1"></a>idx <span class="op">=</span> ((label <span class="op">&lt;=</span> <span class="dv">0</span>).<span class="bu">sum</span>(axis<span class="op">=</span><span class="dv">1</span>) <span class="op">&gt;</span> <span class="dv">60</span>).<span class="bu">sum</span>(axis<span class="op">=</span><span class="dv">1</span>).argmax()</span>
+<span id="cb45-14"><a href="#cb45-14" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb45-15"><a href="#cb45-15" aria-hidden="true" tabindex="-1"></a>scaling_values <span class="op">=</span> {</span>
+<span id="cb45-16"><a href="#cb45-16" aria-hidden="true" tabindex="-1"></a>    <span class="st">"x"</span> : {<span class="st">"min"</span>: <span class="op">-</span><span class="fl">100.</span>, <span class="st">"max"</span>:<span class="fl">100.</span>},</span>
+<span id="cb45-17"><a href="#cb45-17" aria-hidden="true" tabindex="-1"></a>    <span class="st">"y"</span> : {<span class="st">"min"</span>: <span class="op">-</span><span class="fl">100.</span>, <span class="st">"max"</span>:<span class="fl">100.</span>},</span>
+<span id="cb45-18"><a href="#cb45-18" aria-hidden="true" tabindex="-1"></a>    <span class="st">"z"</span> : {<span class="st">"min"</span>: <span class="op">-</span><span class="fl">31.</span>, <span class="st">"max"</span>:<span class="fl">5.</span>},</span>
+<span id="cb45-19"><a href="#cb45-19" aria-hidden="true" tabindex="-1"></a>    <span class="st">"r"</span> : {<span class="st">"min"</span>: <span class="fl">0.</span>, <span class="st">"max"</span>:<span class="fl">1.</span>},</span>
+<span id="cb45-20"><a href="#cb45-20" aria-hidden="true" tabindex="-1"></a>    <span class="st">"d"</span> : {<span class="st">"min"</span>: <span class="fl">0.</span>, <span class="st">"max"</span>:<span class="fl">100.</span>}</span>
+<span id="cb45-21"><a href="#cb45-21" aria-hidden="true" tabindex="-1"></a>}</span>
+<span id="cb45-22"><a href="#cb45-22" aria-hidden="true" tabindex="-1"></a>tfms <span class="op">=</span> v2.Compose([</span>
+<span id="cb45-23"><a href="#cb45-23" aria-hidden="true" tabindex="-1"></a>    ProjectionTransform(proj),</span>
+<span id="cb45-24"><a href="#cb45-24" aria-hidden="true" tabindex="-1"></a>    ProjectionVizTransform(ds.color_map_rgb_np, ds.learning_map_inv_np, scaling_values),</span>
+<span id="cb45-25"><a href="#cb45-25" aria-hidden="true" tabindex="-1"></a>])</span>
+<span id="cb45-26"><a href="#cb45-26" aria-hidden="true" tabindex="-1"></a>ds.set_transform(tfms)</span>
+<span id="cb45-27"><a href="#cb45-27" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb45-28"><a href="#cb45-28" aria-hidden="true" tabindex="-1"></a>item <span class="op">=</span> ds[idx]</span>
+<span id="cb45-29"><a href="#cb45-29" aria-hidden="true" tabindex="-1"></a>i <span class="op">=</span> item[<span class="st">'frame'</span>]</span>
+<span id="cb45-30"><a href="#cb45-30" aria-hidden="true" tabindex="-1"></a>l <span class="op">=</span> item[<span class="st">'label'</span>]</span>
+<span id="cb45-31"><a href="#cb45-31" aria-hidden="true" tabindex="-1"></a>plot_projections(i, l, [<span class="st">'x'</span>, <span class="st">'y'</span>, <span class="st">'z'</span>, <span class="st">'r'</span>, <span class="st">'d'</span>])</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output cell-output-display">
+<div>
+<figure class="figure">
+<p><img src="00_behley2019iccv_files/figure-html/cell-35-output-1.png" class="img-fluid figure-img"></p>
+</figure>
+</div>
+</div>
+</div>
+<p>This level of sparsity could be detrimental to convolutional models, but the total number of samples where this happens seem to be very small with respect to the dataset size. From the best of our knowledge, we haven’t seen this explicitly reported anywhere before.</p>
+<div id="cell-53" class="cell">
+<div class="sourceCode cell-code" id="cb46"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb46-1"><a href="#cb46-1" aria-hidden="true" tabindex="-1"></a>ds.set_transform(tfm)</span>
+<span id="cb46-2"><a href="#cb46-2" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb46-3"><a href="#cb46-3" aria-hidden="true" tabindex="-1"></a>bs <span class="op">=</span> <span class="dv">1000</span></span>
+<span id="cb46-4"><a href="#cb46-4" aria-hidden="true" tabindex="-1"></a>dl <span class="op">=</span> DataLoader(ds, bs, shuffle<span class="op">=</span><span class="va">True</span>)</span>
+<span id="cb46-5"><a href="#cb46-5" aria-hidden="true" tabindex="-1"></a>item <span class="op">=</span> <span class="bu">next</span>(<span class="bu">iter</span>(dl))</span>
+<span id="cb46-6"><a href="#cb46-6" aria-hidden="true" tabindex="-1"></a>img <span class="op">=</span> item[<span class="st">'frame'</span>]</span>
+<span id="cb46-7"><a href="#cb46-7" aria-hidden="true" tabindex="-1"></a>label <span class="op">=</span> item[<span class="st">'label'</span>]</span>
+<span id="cb46-8"><a href="#cb46-8" aria-hidden="true" tabindex="-1"></a>mask <span class="op">=</span> item[<span class="st">'mask'</span>]</span>
+<span id="cb46-9"><a href="#cb46-9" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb46-10"><a href="#cb46-10" aria-hidden="true" tabindex="-1"></a>sparsity <span class="op">=</span> (label <span class="op">&lt;=</span> <span class="dv">0</span>).<span class="bu">sum</span>(axis<span class="op">=</span>(<span class="dv">1</span>,<span class="dv">2</span>))<span class="op">/</span>label[<span class="dv">0</span>].numel()</span>
+<span id="cb46-11"><a href="#cb46-11" aria-hidden="true" tabindex="-1"></a>plt.hist(sparsity, bins<span class="op">=</span><span class="dv">100</span>)<span class="op">;</span></span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output cell-output-display">
+<div>
+<figure class="figure">
+<p><img src="00_behley2019iccv_files/figure-html/cell-36-output-1.png" class="img-fluid figure-img"></p>
+</figure>
+</div>
+</div>
+</div>
+<p>In the next cell we can see how unballanced the dataset is with the <code>motorcyclist</code> class (id 8) having 4 orders of magnitude less segmented pixels than classes such as <code>vegetation</code> (id 15) for example. This is reported with <em>Figure 3</em> in the original paper.</p>
+<div id="cell-55" class="cell">
+<div class="sourceCode cell-code" id="cb47"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb47-1"><a href="#cb47-1" aria-hidden="true" tabindex="-1"></a>l <span class="op">=</span> label.flatten()</span>
+<span id="cb47-2"><a href="#cb47-2" aria-hidden="true" tabindex="-1"></a>values, counts <span class="op">=</span> np.unique(l, return_counts<span class="op">=</span><span class="va">True</span>)</span>
+<span id="cb47-3"><a href="#cb47-3" aria-hidden="true" tabindex="-1"></a>plt.bar(values, np.log10(counts))<span class="op">;</span></span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output cell-output-display">
+<div>
+<figure class="figure">
+<p><img src="00_behley2019iccv_files/figure-html/cell-37-output-1.png" class="img-fluid figure-img"></p>
+</figure>
+</div>
+</div>
+</div>
+</section>
+<section id="dataloaders-for-benchmarking" class="level2">
+<h2 class="anchored" data-anchor-id="dataloaders-for-benchmarking">DataLoaders for benchmarking</h2>
+<p>When benchmarking different semantic segmentation algorithms, the following DataLoaders should be used.</p>
+<div class="callout callout-style-default callout-warning callout-titled">
+<div class="callout-header d-flex align-content-center">
+<div class="callout-icon-container">
+<i class="callout-icon"></i>
+</div>
+<div class="callout-title-container flex-fill">
+Warning
+</div>
+</div>
+<div class="callout-body-container callout-body">
+<p>Data augmentation transforms can be applied <strong>before</strong> (<code>aug_pre_tfms</code>) or <strong>after</strong> (<code>aug_post_tfms</code>) the projection transforms.</p>
+</div>
+</div>
+<hr>
+<p><a href="https://github.com/AIR-UFG/colorcloud/blob/main/colorcloud/behley2019iccv.py#L357" target="_blank" style="float:right; font-size:smaller">source</a></p>
+<section id="get_benchmarking_dls" class="level3">
+<h3 class="anchored" data-anchor-id="get_benchmarking_dls">get_benchmarking_dls</h3>
+<blockquote class="blockquote">
+<pre><code> get_benchmarking_dls (data_path, proj_style='unfold', proj_kargs={'W':
+                       512, 'H': 64}, remapping_rules=None,
+                       train_batch_size=8, val_batch_size=16,
+                       num_workers=8, aug_pre_tfms=None,
+                       aug_post_tfms=None)</code></pre>
+</blockquote>
+<div id="cell-58" class="cell">
+<details open="" class="code-fold">
+<summary>Exported source</summary>
+<div class="sourceCode cell-code" id="cb49"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb49-1"><a href="#cb49-1" aria-hidden="true" tabindex="-1"></a><span class="kw">def</span> get_benchmarking_dls(</span>
+<span id="cb49-2"><a href="#cb49-2" aria-hidden="true" tabindex="-1"></a>    data_path,</span>
+<span id="cb49-3"><a href="#cb49-3" aria-hidden="true" tabindex="-1"></a>    proj_style<span class="op">=</span><span class="st">'unfold'</span>,</span>
+<span id="cb49-4"><a href="#cb49-4" aria-hidden="true" tabindex="-1"></a>    proj_kargs<span class="op">=</span>{<span class="st">'W'</span>: <span class="dv">512</span>, <span class="st">'H'</span>: <span class="dv">64</span>},</span>
+<span id="cb49-5"><a href="#cb49-5" aria-hidden="true" tabindex="-1"></a>    remapping_rules<span class="op">=</span><span class="va">None</span>,</span>
+<span id="cb49-6"><a href="#cb49-6" aria-hidden="true" tabindex="-1"></a>    train_batch_size<span class="op">=</span><span class="dv">8</span>, </span>
+<span id="cb49-7"><a href="#cb49-7" aria-hidden="true" tabindex="-1"></a>    val_batch_size<span class="op">=</span><span class="dv">16</span>,</span>
+<span id="cb49-8"><a href="#cb49-8" aria-hidden="true" tabindex="-1"></a>    num_workers<span class="op">=</span><span class="dv">8</span>,</span>
+<span id="cb49-9"><a href="#cb49-9" aria-hidden="true" tabindex="-1"></a>    aug_pre_tfms<span class="op">=</span><span class="va">None</span>,</span>
+<span id="cb49-10"><a href="#cb49-10" aria-hidden="true" tabindex="-1"></a>    aug_post_tfms<span class="op">=</span><span class="va">None</span></span>
+<span id="cb49-11"><a href="#cb49-11" aria-hidden="true" tabindex="-1"></a>):</span>
+<span id="cb49-12"><a href="#cb49-12" aria-hidden="true" tabindex="-1"></a>    proj_class <span class="op">=</span> {</span>
+<span id="cb49-13"><a href="#cb49-13" aria-hidden="true" tabindex="-1"></a>        <span class="st">'unfold'</span>: UnfoldingProjection,</span>
+<span id="cb49-14"><a href="#cb49-14" aria-hidden="true" tabindex="-1"></a>        <span class="st">'spherical'</span>: SphericalProjection</span>
+<span id="cb49-15"><a href="#cb49-15" aria-hidden="true" tabindex="-1"></a>    }</span>
+<span id="cb49-16"><a href="#cb49-16" aria-hidden="true" tabindex="-1"></a>    <span class="cf">assert</span> proj_style <span class="kw">in</span> proj_class.keys()</span>
+<span id="cb49-17"><a href="#cb49-17" aria-hidden="true" tabindex="-1"></a>    proj <span class="op">=</span> proj_class[proj_style](<span class="op">**</span>proj_kargs)</span>
+<span id="cb49-18"><a href="#cb49-18" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb49-19"><a href="#cb49-19" aria-hidden="true" tabindex="-1"></a>    val_tfms <span class="op">=</span> v2.Compose([</span>
+<span id="cb49-20"><a href="#cb49-20" aria-hidden="true" tabindex="-1"></a>        ProjectionTransform(proj),</span>
+<span id="cb49-21"><a href="#cb49-21" aria-hidden="true" tabindex="-1"></a>        ProjectionToTensorTransform(),</span>
+<span id="cb49-22"><a href="#cb49-22" aria-hidden="true" tabindex="-1"></a>    ])</span>
+<span id="cb49-23"><a href="#cb49-23" aria-hidden="true" tabindex="-1"></a>    <span class="cf">if</span> aug_pre_tfms <span class="kw">is</span> <span class="va">None</span>:</span>
+<span id="cb49-24"><a href="#cb49-24" aria-hidden="true" tabindex="-1"></a>        aug_pre_tfms <span class="op">=</span> nn.Identity()</span>
+<span id="cb49-25"><a href="#cb49-25" aria-hidden="true" tabindex="-1"></a>    <span class="cf">if</span> aug_post_tfms <span class="kw">is</span> <span class="va">None</span>:</span>
+<span id="cb49-26"><a href="#cb49-26" aria-hidden="true" tabindex="-1"></a>        aug_post_tfms <span class="op">=</span> nn.Identity()</span>
+<span id="cb49-27"><a href="#cb49-27" aria-hidden="true" tabindex="-1"></a>    train_tfms <span class="op">=</span> v2.Compose([</span>
+<span id="cb49-28"><a href="#cb49-28" aria-hidden="true" tabindex="-1"></a>        aug_pre_tfms,</span>
+<span id="cb49-29"><a href="#cb49-29" aria-hidden="true" tabindex="-1"></a>        val_tfms,</span>
+<span id="cb49-30"><a href="#cb49-30" aria-hidden="true" tabindex="-1"></a>        aug_post_tfms</span>
+<span id="cb49-31"><a href="#cb49-31" aria-hidden="true" tabindex="-1"></a>    ])</span>
+<span id="cb49-32"><a href="#cb49-32" aria-hidden="true" tabindex="-1"></a>    </span>
+<span id="cb49-33"><a href="#cb49-33" aria-hidden="true" tabindex="-1"></a>    train_ds <span class="op">=</span> SemanticKITTIDataset(data_path, <span class="st">'train'</span>, train_tfms, remapping_rules<span class="op">=</span>remapping_rules)</span>
+<span id="cb49-34"><a href="#cb49-34" aria-hidden="true" tabindex="-1"></a>    train_dl <span class="op">=</span> DataLoader(train_ds, batch_size<span class="op">=</span>train_batch_size, num_workers<span class="op">=</span>num_workers, shuffle<span class="op">=</span><span class="va">True</span>, drop_last<span class="op">=</span><span class="va">True</span>)</span>
+<span id="cb49-35"><a href="#cb49-35" aria-hidden="true" tabindex="-1"></a>    </span>
+<span id="cb49-36"><a href="#cb49-36" aria-hidden="true" tabindex="-1"></a>    val_ds <span class="op">=</span> SemanticKITTIDataset(data_path, <span class="st">'valid'</span>, val_tfms, remapping_rules<span class="op">=</span>remapping_rules)</span>
+<span id="cb49-37"><a href="#cb49-37" aria-hidden="true" tabindex="-1"></a>    val_dl <span class="op">=</span> DataLoader(val_ds, batch_size<span class="op">=</span>val_batch_size, num_workers<span class="op">=</span>num_workers)</span>
+<span id="cb49-38"><a href="#cb49-38" aria-hidden="true" tabindex="-1"></a>    </span>
+<span id="cb49-39"><a href="#cb49-39" aria-hidden="true" tabindex="-1"></a>    <span class="cf">return</span> train_dl, val_dl</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+</details>
+</div>
+
+
+</section>
+</section>
+
+</main> <!-- /main -->
+<script id="quarto-html-after-body" type="application/javascript">
+  window.document.addEventListener("DOMContentLoaded", function (event) {
+    const icon = "";
+    const anchorJS = new window.AnchorJS();
+    anchorJS.options = {
+      placement: 'right',
+      icon: icon
+    };
+    anchorJS.add('.anchored');
+    const isCodeAnnotation = (el) => {
+      for (const clz of el.classList) {
+        if (clz.startsWith('code-annotation-')) {                     
+          return true;
+        }
+      }
+      return false;
+    }
+    const onCopySuccess = function(e) {
+      // button target
+      const button = e.trigger;
+      // don't keep focus
+      button.blur();
+      // flash "checked"
+      button.classList.add('code-copy-button-checked');
+      var currentTitle = button.getAttribute("title");
+      button.setAttribute("title", "Copied!");
+      let tooltip;
+      if (window.bootstrap) {
+        button.setAttribute("data-bs-toggle", "tooltip");
+        button.setAttribute("data-bs-placement", "left");
+        button.setAttribute("data-bs-title", "Copied!");
+        tooltip = new bootstrap.Tooltip(button, 
+          { trigger: "manual", 
+            customClass: "code-copy-button-tooltip",
+            offset: [0, -8]});
+        tooltip.show();    
+      }
+      setTimeout(function() {
+        if (tooltip) {
+          tooltip.hide();
+          button.removeAttribute("data-bs-title");
+          button.removeAttribute("data-bs-toggle");
+          button.removeAttribute("data-bs-placement");
+        }
+        button.setAttribute("title", currentTitle);
+        button.classList.remove('code-copy-button-checked');
+      }, 1000);
+      // clear code selection
+      e.clearSelection();
+    }
+    const getTextToCopy = function(trigger) {
+        const codeEl = trigger.previousElementSibling.cloneNode(true);
+        for (const childEl of codeEl.children) {
+          if (isCodeAnnotation(childEl)) {
+            childEl.remove();
+          }
+        }
+        return codeEl.innerText;
+    }
+    const clipboard = new window.ClipboardJS('.code-copy-button:not([data-in-quarto-modal])', {
+      text: getTextToCopy
+    });
+    clipboard.on('success', onCopySuccess);
+    if (window.document.getElementById('quarto-embedded-source-code-modal')) {
+      const clipboardModal = new window.ClipboardJS('.code-copy-button[data-in-quarto-modal]', {
+        text: getTextToCopy,
+        container: window.document.getElementById('quarto-embedded-source-code-modal')
+      });
+      clipboardModal.on('success', onCopySuccess);
+    }
+      var localhostRegex = new RegExp(/^(?:http|https):\/\/localhost\:?[0-9]*\//);
+      var mailtoRegex = new RegExp(/^mailto:/);
+        var filterRegex = new RegExp("https:\/\/AIR-UFG\.github\.io\/colorcloud");
+      var isInternal = (href) => {
+          return filterRegex.test(href) || localhostRegex.test(href) || mailtoRegex.test(href);
+      }
+      // Inspect non-navigation links and adorn them if external
+     var links = window.document.querySelectorAll('a[href]:not(.nav-link):not(.navbar-brand):not(.toc-action):not(.sidebar-link):not(.sidebar-item-toggle):not(.pagination-link):not(.no-external):not([aria-hidden]):not(.dropdown-item):not(.quarto-navigation-tool):not(.about-link)');
+      for (var i=0; i<links.length; i++) {
+        const link = links[i];
+        if (!isInternal(link.href)) {
+          // undo the damage that might have been done by quarto-nav.js in the case of
+          // links that we want to consider external
+          if (link.dataset.originalHref !== undefined) {
+            link.href = link.dataset.originalHref;
+          }
+        }
+      }
+    function tippyHover(el, contentFn, onTriggerFn, onUntriggerFn) {
+      const config = {
+        allowHTML: true,
+        maxWidth: 500,
+        delay: 100,
+        arrow: false,
+        appendTo: function(el) {
+            return el.parentElement;
+        },
+        interactive: true,
+        interactiveBorder: 10,
+        theme: 'quarto',
+        placement: 'bottom-start',
+      };
+      if (contentFn) {
+        config.content = contentFn;
+      }
+      if (onTriggerFn) {
+        config.onTrigger = onTriggerFn;
+      }
+      if (onUntriggerFn) {
+        config.onUntrigger = onUntriggerFn;
+      }
+      window.tippy(el, config); 
+    }
+    const noterefs = window.document.querySelectorAll('a[role="doc-noteref"]');
+    for (var i=0; i<noterefs.length; i++) {
+      const ref = noterefs[i];
+      tippyHover(ref, function() {
+        // use id or data attribute instead here
+        let href = ref.getAttribute('data-footnote-href') || ref.getAttribute('href');
+        try { href = new URL(href).hash; } catch {}
+        const id = href.replace(/^#\/?/, "");
+        const note = window.document.getElementById(id);
+        if (note) {
+          return note.innerHTML;
+        } else {
+          return "";
+        }
+      });
+    }
+    const xrefs = window.document.querySelectorAll('a.quarto-xref');
+    const processXRef = (id, note) => {
+      // Strip column container classes
+      const stripColumnClz = (el) => {
+        el.classList.remove("page-full", "page-columns");
+        if (el.children) {
+          for (const child of el.children) {
+            stripColumnClz(child);
+          }
+        }
+      }
+      stripColumnClz(note)
+      if (id === null || id.startsWith('sec-')) {
+        // Special case sections, only their first couple elements
+        const container = document.createElement("div");
+        if (note.children && note.children.length > 2) {
+          container.appendChild(note.children[0].cloneNode(true));
+          for (let i = 1; i < note.children.length; i++) {
+            const child = note.children[i];
+            if (child.tagName === "P" && child.innerText === "") {
+              continue;
+            } else {
+              container.appendChild(child.cloneNode(true));
+              break;
+            }
+          }
+          if (window.Quarto?.typesetMath) {
+            window.Quarto.typesetMath(container);
+          }
+          return container.innerHTML
+        } else {
+          if (window.Quarto?.typesetMath) {
+            window.Quarto.typesetMath(note);
+          }
+          return note.innerHTML;
+        }
+      } else {
+        // Remove any anchor links if they are present
+        const anchorLink = note.querySelector('a.anchorjs-link');
+        if (anchorLink) {
+          anchorLink.remove();
+        }
+        if (window.Quarto?.typesetMath) {
+          window.Quarto.typesetMath(note);
+        }
+        if (note.classList.contains("callout")) {
+          return note.outerHTML;
+        } else {
+          return note.innerHTML;
+        }
+      }
+    }
+    for (var i=0; i<xrefs.length; i++) {
+      const xref = xrefs[i];
+      tippyHover(xref, undefined, function(instance) {
+        instance.disable();
+        let url = xref.getAttribute('href');
+        let hash = undefined; 
+        if (url.startsWith('#')) {
+          hash = url;
+        } else {
+          try { hash = new URL(url).hash; } catch {}
+        }
+        if (hash) {
+          const id = hash.replace(/^#\/?/, "");
+          const note = window.document.getElementById(id);
+          if (note !== null) {
+            try {
+              const html = processXRef(id, note.cloneNode(true));
+              instance.setContent(html);
+            } finally {
+              instance.enable();
+              instance.show();
+            }
+          } else {
+            // See if we can fetch this
+            fetch(url.split('#')[0])
+            .then(res => res.text())
+            .then(html => {
+              const parser = new DOMParser();
+              const htmlDoc = parser.parseFromString(html, "text/html");
+              const note = htmlDoc.getElementById(id);
+              if (note !== null) {
+                const html = processXRef(id, note);
+                instance.setContent(html);
+              } 
+            }).finally(() => {
+              instance.enable();
+              instance.show();
+            });
+          }
+        } else {
+          // See if we can fetch a full url (with no hash to target)
+          // This is a special case and we should probably do some content thinning / targeting
+          fetch(url)
+          .then(res => res.text())
+          .then(html => {
+            const parser = new DOMParser();
+            const htmlDoc = parser.parseFromString(html, "text/html");
+            const note = htmlDoc.querySelector('main.content');
+            if (note !== null) {
+              // This should only happen for chapter cross references
+              // (since there is no id in the URL)
+              // remove the first header
+              if (note.children.length > 0 && note.children[0].tagName === "HEADER") {
+                note.children[0].remove();
+              }
+              const html = processXRef(null, note);
+              instance.setContent(html);
+            } 
+          }).finally(() => {
+            instance.enable();
+            instance.show();
+          });
+        }
+      }, function(instance) {
+      });
+    }
+        let selectedAnnoteEl;
+        const selectorForAnnotation = ( cell, annotation) => {
+          let cellAttr = 'data-code-cell="' + cell + '"';
+          let lineAttr = 'data-code-annotation="' +  annotation + '"';
+          const selector = 'span[' + cellAttr + '][' + lineAttr + ']';
+          return selector;
+        }
+        const selectCodeLines = (annoteEl) => {
+          const doc = window.document;
+          const targetCell = annoteEl.getAttribute("data-target-cell");
+          const targetAnnotation = annoteEl.getAttribute("data-target-annotation");
+          const annoteSpan = window.document.querySelector(selectorForAnnotation(targetCell, targetAnnotation));
+          const lines = annoteSpan.getAttribute("data-code-lines").split(",");
+          const lineIds = lines.map((line) => {
+            return targetCell + "-" + line;
+          })
+          let top = null;
+          let height = null;
+          let parent = null;
+          if (lineIds.length > 0) {
+              //compute the position of the single el (top and bottom and make a div)
+              const el = window.document.getElementById(lineIds[0]);
+              top = el.offsetTop;
+              height = el.offsetHeight;
+              parent = el.parentElement.parentElement;
+            if (lineIds.length > 1) {
+              const lastEl = window.document.getElementById(lineIds[lineIds.length - 1]);
+              const bottom = lastEl.offsetTop + lastEl.offsetHeight;
+              height = bottom - top;
+            }
+            if (top !== null && height !== null && parent !== null) {
+              // cook up a div (if necessary) and position it 
+              let div = window.document.getElementById("code-annotation-line-highlight");
+              if (div === null) {
+                div = window.document.createElement("div");
+                div.setAttribute("id", "code-annotation-line-highlight");
+                div.style.position = 'absolute';
+                parent.appendChild(div);
+              }
+              div.style.top = top - 2 + "px";
+              div.style.height = height + 4 + "px";
+              div.style.left = 0;
+              let gutterDiv = window.document.getElementById("code-annotation-line-highlight-gutter");
+              if (gutterDiv === null) {
+                gutterDiv = window.document.createElement("div");
+                gutterDiv.setAttribute("id", "code-annotation-line-highlight-gutter");
+                gutterDiv.style.position = 'absolute';
+                const codeCell = window.document.getElementById(targetCell);
+                const gutter = codeCell.querySelector('.code-annotation-gutter');
+                gutter.appendChild(gutterDiv);
+              }
+              gutterDiv.style.top = top - 2 + "px";
+              gutterDiv.style.height = height + 4 + "px";
+            }
+            selectedAnnoteEl = annoteEl;
+          }
+        };
+        const unselectCodeLines = () => {
+          const elementsIds = ["code-annotation-line-highlight", "code-annotation-line-highlight-gutter"];
+          elementsIds.forEach((elId) => {
+            const div = window.document.getElementById(elId);
+            if (div) {
+              div.remove();
+            }
+          });
+          selectedAnnoteEl = undefined;
+        };
+          // Handle positioning of the toggle
+      window.addEventListener(
+        "resize",
+        throttle(() => {
+          elRect = undefined;
+          if (selectedAnnoteEl) {
+            selectCodeLines(selectedAnnoteEl);
+          }
+        }, 10)
+      );
+      function throttle(fn, ms) {
+      let throttle = false;
+      let timer;
+        return (...args) => {
+          if(!throttle) { // first call gets through
+              fn.apply(this, args);
+              throttle = true;
+          } else { // all the others get throttled
+              if(timer) clearTimeout(timer); // cancel #2
+              timer = setTimeout(() => {
+                fn.apply(this, args);
+                timer = throttle = false;
+              }, ms);
+          }
+        };
+      }
+        // Attach click handler to the DT
+        const annoteDls = window.document.querySelectorAll('dt[data-target-cell]');
+        for (const annoteDlNode of annoteDls) {
+          annoteDlNode.addEventListener('click', (event) => {
+            const clickedEl = event.target;
+            if (clickedEl !== selectedAnnoteEl) {
+              unselectCodeLines();
+              const activeEl = window.document.querySelector('dt[data-target-cell].code-annotation-active');
+              if (activeEl) {
+                activeEl.classList.remove('code-annotation-active');
+              }
+              selectCodeLines(clickedEl);
+              clickedEl.classList.add('code-annotation-active');
+            } else {
+              // Unselect the line
+              unselectCodeLines();
+              clickedEl.classList.remove('code-annotation-active');
+            }
+          });
+        }
+    const findCites = (el) => {
+      const parentEl = el.parentElement;
+      if (parentEl) {
+        const cites = parentEl.dataset.cites;
+        if (cites) {
+          return {
+            el,
+            cites: cites.split(' ')
+          };
+        } else {
+          return findCites(el.parentElement)
+        }
+      } else {
+        return undefined;
+      }
+    };
+    var bibliorefs = window.document.querySelectorAll('a[role="doc-biblioref"]');
+    for (var i=0; i<bibliorefs.length; i++) {
+      const ref = bibliorefs[i];
+      const citeInfo = findCites(ref);
+      if (citeInfo) {
+        tippyHover(citeInfo.el, function() {
+          var popup = window.document.createElement('div');
+          citeInfo.cites.forEach(function(cite) {
+            var citeDiv = window.document.createElement('div');
+            citeDiv.classList.add('hanging-indent');
+            citeDiv.classList.add('csl-entry');
+            var biblioDiv = window.document.getElementById('ref-' + cite);
+            if (biblioDiv) {
+              citeDiv.innerHTML = biblioDiv.innerHTML;
+            }
+            popup.appendChild(citeDiv);
+          });
+          return popup.innerHTML;
+        });
+      }
+    }
+  });
+  </script>
+</div> <!-- /content -->
+
+
+
+
+<footer class="footer"><div class="nav-footer"><div class="nav-footer-center"><div class="toc-actions d-sm-block d-md-none"><ul><li><a href="https://github.com/AIR-UFG/colorcloud/issues/new" class="toc-action"><i class="bi bi-github"></i>Report an issue</a></li></ul></div></div></div></footer></body></html>

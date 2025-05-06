@@ -1,0 +1,1353 @@
+<!DOCTYPE html>
+<html xmlns="http://www.w3.org/1999/xhtml" lang="en" xml:lang="en"><head>
+
+<meta charset="utf-8">
+<meta name="generator" content="quarto-1.7.30">
+
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
+
+<meta name="description" content="Module that implements the model from RIU-Net: Embarrassingly simple semantic segmentation of 3D LiDAR point cloud.">
+
+<title>biasutti2019riu – colorcloud</title>
+<style>
+code{white-space: pre-wrap;}
+span.smallcaps{font-variant: small-caps;}
+div.columns{display: flex; gap: min(4vw, 1.5em);}
+div.column{flex: auto; overflow-x: auto;}
+div.hanging-indent{margin-left: 1.5em; text-indent: -1.5em;}
+ul.task-list{list-style: none;}
+ul.task-list li input[type="checkbox"] {
+  width: 0.8em;
+  margin: 0 0.8em 0.2em -1em; /* quarto-specific, see https://github.com/quarto-dev/quarto-cli/issues/4556 */ 
+  vertical-align: middle;
+}
+/* CSS for syntax highlighting */
+html { -webkit-text-size-adjust: 100%; }
+pre > code.sourceCode { white-space: pre; position: relative; }
+pre > code.sourceCode > span { display: inline-block; line-height: 1.25; }
+pre > code.sourceCode > span:empty { height: 1.2em; }
+.sourceCode { overflow: visible; }
+code.sourceCode > span { color: inherit; text-decoration: inherit; }
+div.sourceCode { margin: 1em 0; }
+pre.sourceCode { margin: 0; }
+@media screen {
+div.sourceCode { overflow: auto; }
+}
+@media print {
+pre > code.sourceCode { white-space: pre-wrap; }
+pre > code.sourceCode > span { text-indent: -5em; padding-left: 5em; }
+}
+pre.numberSource code
+  { counter-reset: source-line 0; }
+pre.numberSource code > span
+  { position: relative; left: -4em; counter-increment: source-line; }
+pre.numberSource code > span > a:first-child::before
+  { content: counter(source-line);
+    position: relative; left: -1em; text-align: right; vertical-align: baseline;
+    border: none; display: inline-block;
+    -webkit-touch-callout: none; -webkit-user-select: none;
+    -khtml-user-select: none; -moz-user-select: none;
+    -ms-user-select: none; user-select: none;
+    padding: 0 4px; width: 4em;
+  }
+pre.numberSource { margin-left: 3em;  padding-left: 4px; }
+div.sourceCode
+  {   }
+@media screen {
+pre > code.sourceCode > span > a:first-child::before { text-decoration: underline; }
+}
+</style>
+
+
+<script src="site_libs/quarto-nav/quarto-nav.js"></script>
+<script src="site_libs/quarto-nav/headroom.min.js"></script>
+<script src="site_libs/clipboard/clipboard.min.js"></script>
+<script src="site_libs/quarto-search/autocomplete.umd.js"></script>
+<script src="site_libs/quarto-search/fuse.min.js"></script>
+<script src="site_libs/quarto-search/quarto-search.js"></script>
+<meta name="quarto:offset" content="./">
+<script src="site_libs/quarto-html/quarto.js" type="module"></script>
+<script src="site_libs/quarto-html/tabsets/tabsets.js" type="module"></script>
+<script src="site_libs/quarto-html/popper.min.js"></script>
+<script src="site_libs/quarto-html/tippy.umd.min.js"></script>
+<script src="site_libs/quarto-html/anchor.min.js"></script>
+<link href="site_libs/quarto-html/tippy.css" rel="stylesheet">
+<link href="site_libs/quarto-html/quarto-syntax-highlighting-de070a7b0ab54f8780927367ac907214.css" rel="stylesheet" id="quarto-text-highlighting-styles">
+<script src="site_libs/bootstrap/bootstrap.min.js"></script>
+<link href="site_libs/bootstrap/bootstrap-icons.css" rel="stylesheet">
+<link href="site_libs/bootstrap/bootstrap-c4832a576a2b2751674216aa53ffbffd.min.css" rel="stylesheet" append-hash="true" id="quarto-bootstrap" data-mode="light">
+<script id="quarto-search-options" type="application/json">{
+  "location": "navbar",
+  "copy-button": false,
+  "collapse-after": 3,
+  "panel-placement": "end",
+  "type": "overlay",
+  "limit": 50,
+  "keyboard-shortcut": [
+    "f",
+    "/",
+    "s"
+  ],
+  "show-item-context": false,
+  "language": {
+    "search-no-results-text": "No results",
+    "search-matching-documents-text": "matching documents",
+    "search-copy-link-title": "Copy link to search",
+    "search-hide-matches-text": "Hide additional matches",
+    "search-more-match-text": "more match in this document",
+    "search-more-matches-text": "more matches in this document",
+    "search-clear-button-title": "Clear",
+    "search-text-placeholder": "",
+    "search-detached-cancel-button-title": "Cancel",
+    "search-submit-button-title": "Submit",
+    "search-label": "Search"
+  }
+}</script>
+<script src="site_libs/quarto-diagram/mermaid.min.js"></script>
+<script src="site_libs/quarto-diagram/mermaid-init.js"></script>
+<link href="site_libs/quarto-diagram/mermaid.css" rel="stylesheet">
+
+  <script src="https://cdnjs.cloudflare.com/polyfill/v3/polyfill.min.js?features=es6"></script>
+  <script src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-chtml-full.js" type="text/javascript"></script>
+
+<script type="text/javascript">
+const typesetMath = (el) => {
+  if (window.MathJax) {
+    // MathJax Typeset
+    window.MathJax.typeset([el]);
+  } else if (window.katex) {
+    // KaTeX Render
+    var mathElements = el.getElementsByClassName("math");
+    var macros = [];
+    for (var i = 0; i < mathElements.length; i++) {
+      var texText = mathElements[i].firstChild;
+      if (mathElements[i].tagName == "SPAN") {
+        window.katex.render(texText.data, mathElements[i], {
+          displayMode: mathElements[i].classList.contains('display'),
+          throwOnError: false,
+          macros: macros,
+          fleqn: false
+        });
+      }
+    }
+  }
+}
+window.Quarto = {
+  typesetMath
+};
+</script>
+
+<link rel="stylesheet" href="styles.css">
+<meta property="og:title" content="biasutti2019riu – colorcloud">
+<meta property="og:description" content="Module that implements the model from RIU-Net: Embarrassingly simple semantic segmentation of 3D LiDAR point cloud.">
+<meta property="og:image" content="https://AIR-UFG.github.io/colorcloud/01_biasutti2019riu_files/figure-html/4cd43664-1aca-4833-9c50-52343431485c-1-e5943abd-a9d8-4fc2-a12d-7014c7fae1d4.png">
+<meta property="og:site_name" content="colorcloud">
+<meta property="og:image:alt" content="Figure from the original paper (Fig.2).">
+<meta property="og:image:height" content="830">
+<meta property="og:image:width" content="733">
+<meta name="twitter:title" content="biasutti2019riu – colorcloud">
+<meta name="twitter:description" content="Module that implements the model from RIU-Net: Embarrassingly simple semantic segmentation of 3D LiDAR point cloud.">
+<meta name="twitter:image" content="https://AIR-UFG.github.io/colorcloud/01_biasutti2019riu_files/figure-html/4cd43664-1aca-4833-9c50-52343431485c-1-e5943abd-a9d8-4fc2-a12d-7014c7fae1d4.png">
+<meta name="twitter:image:alt" content="Figure from the original paper (Fig.2).">
+<meta name="twitter:image-height" content="830">
+<meta name="twitter:image-width" content="733">
+<meta name="twitter:card" content="summary_large_image">
+</head>
+
+<body class="nav-sidebar floating nav-fixed quarto-light">
+
+<div id="quarto-search-results"></div>
+  <header id="quarto-header" class="headroom fixed-top">
+    <nav class="navbar navbar-expand-lg " data-bs-theme="dark">
+      <div class="navbar-container container-fluid">
+      <div class="navbar-brand-container mx-auto">
+    <a class="navbar-brand" href="./index.html">
+    <span class="navbar-title">colorcloud</span>
+    </a>
+  </div>
+        <div class="quarto-navbar-tools tools-end">
+</div>
+          <div id="quarto-search" class="" title="Search"></div>
+      </div> <!-- /container-fluid -->
+    </nav>
+  <nav class="quarto-secondary-nav">
+    <div class="container-fluid d-flex">
+      <button type="button" class="quarto-btn-toggle btn" data-bs-toggle="collapse" role="button" data-bs-target=".quarto-sidebar-collapse-item" aria-controls="quarto-sidebar" aria-expanded="false" aria-label="Toggle sidebar navigation" onclick="if (window.quartoToggleHeadroom) { window.quartoToggleHeadroom(); }">
+        <i class="bi bi-layout-text-sidebar-reverse"></i>
+      </button>
+        <nav class="quarto-page-breadcrumbs" aria-label="breadcrumb"><ol class="breadcrumb"><li class="breadcrumb-item"><a href="./biasutti2019riu.html">biasutti2019riu</a></li></ol></nav>
+        <a class="flex-grow-1" role="navigation" data-bs-toggle="collapse" data-bs-target=".quarto-sidebar-collapse-item" aria-controls="quarto-sidebar" aria-expanded="false" aria-label="Toggle sidebar navigation" onclick="if (window.quartoToggleHeadroom) { window.quartoToggleHeadroom(); }">      
+        </a>
+    </div>
+  </nav>
+</header>
+<!-- content -->
+<div id="quarto-content" class="quarto-container page-columns page-rows-contents page-layout-article page-navbar">
+<!-- sidebar -->
+  <nav id="quarto-sidebar" class="sidebar collapse collapse-horizontal quarto-sidebar-collapse-item sidebar-navigation floating overflow-auto">
+    <div class="sidebar-menu-container"> 
+    <ul class="list-unstyled mt-1">
+        <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="./index.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">colorcloud</span></a>
+  </div>
+</li>
+        <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="./behley2019iccv.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">behley2019iccv</span></a>
+  </div>
+</li>
+        <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="./biasutti2019riu.html" class="sidebar-item-text sidebar-link active">
+ <span class="menu-text">biasutti2019riu</span></a>
+  </div>
+</li>
+        <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="./chen2020mvlidarnet.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">chen2020mvlidarnet</span></a>
+  </div>
+</li>
+    </ul>
+    </div>
+</nav>
+<div id="quarto-sidebar-glass" class="quarto-sidebar-collapse-item" data-bs-toggle="collapse" data-bs-target=".quarto-sidebar-collapse-item"></div>
+<!-- margin-sidebar -->
+    <div id="quarto-margin-sidebar" class="sidebar margin-sidebar">
+        <nav id="TOC" role="doc-toc" class="toc-active">
+    <h2 id="toc-title">On this page</h2>
+   
+  <ul>
+  <li><a href="#introduction" id="toc-introduction" class="nav-link active" data-scroll-target="#introduction">1. Introduction</a></li>
+  <li><a href="#riunet-architecture" id="toc-riunet-architecture" class="nav-link" data-scroll-target="#riunet-architecture">RIUNet architecture</a>
+  <ul class="collapse">
+  <li><a href="#block" id="toc-block" class="nav-link" data-scroll-target="#block">Block</a></li>
+  <li><a href="#encoder" id="toc-encoder" class="nav-link" data-scroll-target="#encoder">Encoder</a></li>
+  <li><a href="#upconv" id="toc-upconv" class="nav-link" data-scroll-target="#upconv">UpConv</a></li>
+  <li><a href="#decoder" id="toc-decoder" class="nav-link" data-scroll-target="#decoder">Decoder</a></li>
+  <li><a href="#riunet" id="toc-riunet" class="nav-link" data-scroll-target="#riunet">RIUNet</a></li>
+  </ul></li>
+  <li><a href="#loss-function" id="toc-loss-function" class="nav-link" data-scroll-target="#loss-function">Loss function</a>
+  <ul class="collapse">
+  <li><a href="#weightedmaskedceloss" id="toc-weightedmaskedceloss" class="nav-link" data-scroll-target="#weightedmaskedceloss">WeightedMaskedCELoss</a></li>
+  </ul></li>
+  <li><a href="#metrics" id="toc-metrics" class="nav-link" data-scroll-target="#metrics">Metrics</a>
+  <ul class="collapse">
+  <li><a href="#segmentationiou" id="toc-segmentationiou" class="nav-link" data-scroll-target="#segmentationiou">SegmentationIoU</a></li>
+  </ul></li>
+  <li><a href="#semantickitti-experiments" id="toc-semantickitti-experiments" class="nav-link" data-scroll-target="#semantickitti-experiments">SemanticKITTI Experiments</a></li>
+  </ul>
+<div class="toc-actions"><ul><li><a href="https://github.com/AIR-UFG/colorcloud/issues/new" class="toc-action"><i class="bi bi-github"></i>Report an issue</a></li></ul></div></nav>
+    </div>
+<!-- main -->
+<main class="content" id="quarto-document-content">
+
+<header id="title-block-header" class="quarto-title-block default">
+<div class="quarto-title">
+<h1 class="title">biasutti2019riu</h1>
+</div>
+
+<div>
+  <div class="description">
+    Module that implements the model from <a href="https://arxiv.org/abs/1905.08748">RIU-Net: Embarrassingly simple semantic segmentation of 3D LiDAR point cloud</a>.
+  </div>
+</div>
+
+
+<div class="quarto-title-meta">
+
+    
+  
+    
+  </div>
+  
+
+
+</header>
+
+
+<!-- WARNING: THIS FILE WAS AUTOGENERATED! DO NOT EDIT! -->
+<p>Summarizing quotes from the paper:</p>
+<section id="introduction" class="level3">
+<h3 class="anchored" data-anchor-id="introduction">1. Introduction</h3>
+<blockquote class="blockquote">
+<ul>
+<li>“we propose RIU-Net (for Range-Image U-Net), the adaptation of <a href="https://arxiv.org/abs/1505.04597">U-Net</a> […] to the semantic segmentation of 3D LiDAR point clouds.” ### 2. Related works</li>
+<li>“Recently, Wu et al.&nbsp;proposed <a href="https://arxiv.org/pdf/1710.07368">SqueezeSeg</a>, a novel approach for the semantic segmentation of a LiDAR point cloud represented as a <strong>spherical range-image</strong>.” ### 3. Methodology</li>
+<li>“The method consists in feeding the <a href="https://arxiv.org/abs/1505.04597">U-Net</a> architectures with 2-channels [range-images] encoding range and elevation.” #### 3.A Input of the Network</li>
+<li>“we use a range-image named u of <strong>512 × 64px</strong> with two channels: the <strong>depth</strong> towards the sensor and the <strong>elevation</strong>.”</li>
+<li>“We propose to identify [<strong>empty pixels</strong> (pixels that are considered invalid by the LIDAR sensor)] using a binary mask m equal to 0 for empty pixels and to 1 otherwise.” #### 3.B Architecture <img src="01_biasutti2019riu_files/figure-html/4cd43664-1aca-4833-9c50-52343431485c-1-e5943abd-a9d8-4fc2-a12d-7014c7fae1d4.png" class="img-fluid" alt="Figure from the original paper (Fig.2)."></li>
+<li>“the <a href="#encoder">encoder</a> consists in the repeated application of <strong>two 3×3 convolutions</strong> followed by a rectified linear unit (<strong>ReLU</strong>) and a <strong>2×2 max-pooling</strong> layer that downsamples the input by a factor 2. Each time a downsampling is done, the <strong>number of features is doubled</strong>.”</li>
+<li>“The <a href="#decoder">decoder</a> consists in upsampling blocks where the input is upsampled using <strong>2 × 2 up-convolutions</strong>. Then, <strong>concatenation</strong> is done between the <strong>upsampled feature map</strong> and the <strong>corresponding feature map of the <a href="#encoder">encoder</a></strong>. After that, two 3 × 3 convolutions are applied followed by a ReLU. This block is <strong>repeated</strong> until the output of the network matches the dimension of the input.”</li>
+<li>“the last layer consists in a <strong>1x1 convolution</strong> that outputs as many features as the wanted number of possible labels K 1-hot encoded.” #### 3.C Loss function</li>
+<li>“is defined as the cross-entropy of the softmax of the output of the network.”</li>
+</ul>
+</blockquote>
+<p><span class="math display">\[
+E = -\sum_{x \in \Omega}{ \mathbf{1}_{\{m(x)&gt;0\}}w(x)\log(p_{l(x)}(x))}
+\]</span></p>
+<blockquote class="blockquote">
+<ul>
+<li>“[in the equation shown above (corrected from the paper)] we define <span class="math inline">\(l(x)\)</span> the groundtruth label of the x pixel. […] <span class="math inline">\(m(x) &gt; 0\)</span> are the <strong>valid pixels</strong> [(non-empty pixels)] and <span class="math inline">\(w(x)\)</span> is a <strong>weighting function</strong> introduced to give <strong>more importance to pixels that are close to a separation between two labels</strong>, as defined in <a href="https://arxiv.org/abs/1505.04597">U-Net</a>.” #### 3.D Training</li>
+<li>“We train the network with the <strong>Adam</strong> stochastic gradient optimizer and a <strong>learning rate set to 0.001</strong>. We also use <strong>batch normalization with a momentum of 0.99</strong> to ensure good convergence of the model. Finally, the <strong>batch size is set to 8</strong> and the training is stopped after <strong>10 epochs</strong>.” ### 4. Experiments</li>
+<li>“we follow the experimental setup of the <a href="https://arxiv.org/pdf/1710.07368">SqueezeSeg</a> approach</li>
+<li>“[it uses] range-images with segmentation labels exported from the 3D object detection challenge of the KITTI dataset”</li>
+<li>“[the training/validation split] contains <strong>8057 samples for training</strong> and <strong>2791 for validation</strong>”</li>
+<li>“we use the <strong>intersection-over-union</strong> metric”</li>
+<li>“we advocate that the proposed model can operate with a frame-rate of <strong>90 frames per second on a single GPU</strong>”</li>
+</ul>
+</blockquote>
+</section>
+<section id="riunet-architecture" class="level2">
+<h2 class="anchored" data-anchor-id="riunet-architecture">RIUNet architecture</h2>
+<hr>
+<p><a href="https://github.com/AIR-UFG/colorcloud/blob/main/colorcloud/biasutti2019riu.py#L21" target="_blank" style="float:right; font-size:smaller">source</a></p>
+<section id="block" class="level3">
+<h3 class="anchored" data-anchor-id="block">Block</h3>
+<blockquote class="blockquote">
+<pre><code> Block (in_channels, out_channels)</code></pre>
+</blockquote>
+<p><em>Convolutional block repeatedly used in the RIU-Net encoder and decoder.</em></p>
+<div id="4818cc4f-4ebb-454d-9ab1-edeb6f5b22e1" class="cell">
+<details open="" class="code-fold">
+<summary>Exported source</summary>
+<div class="sourceCode cell-code" id="cb2"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb2-1"><a href="#cb2-1" aria-hidden="true" tabindex="-1"></a><span class="kw">class</span> Block(Sequential):</span>
+<span id="cb2-2"><a href="#cb2-2" aria-hidden="true" tabindex="-1"></a>    <span class="co">"Convolutional block repeatedly used in the RIU-Net encoder and decoder."</span></span>
+<span id="cb2-3"><a href="#cb2-3" aria-hidden="true" tabindex="-1"></a>    <span class="kw">def</span> <span class="fu">__init__</span>(<span class="va">self</span>, in_channels, out_channels):</span>
+<span id="cb2-4"><a href="#cb2-4" aria-hidden="true" tabindex="-1"></a>        <span class="bu">super</span>().<span class="fu">__init__</span>(OrderedDict([</span>
+<span id="cb2-5"><a href="#cb2-5" aria-hidden="true" tabindex="-1"></a>            (<span class="ss">f'conv1'</span>, Conv2d(in_channels, out_channels, <span class="dv">3</span>, <span class="dv">1</span>, <span class="dv">1</span>, bias<span class="op">=</span><span class="va">False</span>, padding_mode<span class="op">=</span><span class="st">'circular'</span>)),</span>
+<span id="cb2-6"><a href="#cb2-6" aria-hidden="true" tabindex="-1"></a>            (<span class="ss">f'bn1'</span>, BatchNorm2d(out_channels, momentum<span class="op">=</span><span class="fl">0.01</span>)),</span>
+<span id="cb2-7"><a href="#cb2-7" aria-hidden="true" tabindex="-1"></a>            (<span class="ss">f'relu1'</span>, ReLU()),</span>
+<span id="cb2-8"><a href="#cb2-8" aria-hidden="true" tabindex="-1"></a>            (<span class="ss">f'conv2'</span>, Conv2d(out_channels, out_channels, <span class="dv">3</span>, <span class="dv">1</span>, <span class="dv">1</span>, bias<span class="op">=</span><span class="va">False</span>, padding_mode<span class="op">=</span><span class="st">'circular'</span>)),</span>
+<span id="cb2-9"><a href="#cb2-9" aria-hidden="true" tabindex="-1"></a>            (<span class="ss">f'bn2'</span>, BatchNorm2d(out_channels, momentum<span class="op">=</span><span class="fl">0.01</span>)),</span>
+<span id="cb2-10"><a href="#cb2-10" aria-hidden="true" tabindex="-1"></a>            (<span class="ss">f'relu2'</span>, ReLU()),</span>
+<span id="cb2-11"><a href="#cb2-11" aria-hidden="true" tabindex="-1"></a>        ]))</span>
+<span id="cb2-12"><a href="#cb2-12" aria-hidden="true" tabindex="-1"></a>        <span class="va">self</span>.init_params()</span>
+<span id="cb2-13"><a href="#cb2-13" aria-hidden="true" tabindex="-1"></a>    </span>
+<span id="cb2-14"><a href="#cb2-14" aria-hidden="true" tabindex="-1"></a>    <span class="kw">def</span> init_params(<span class="va">self</span>):</span>
+<span id="cb2-15"><a href="#cb2-15" aria-hidden="true" tabindex="-1"></a>        <span class="cf">for</span> n, p <span class="kw">in</span> <span class="va">self</span>.named_parameters():</span>
+<span id="cb2-16"><a href="#cb2-16" aria-hidden="true" tabindex="-1"></a>            <span class="cf">if</span> re.search(<span class="st">'conv</span><span class="er">\</span><span class="st">d</span><span class="er">\</span><span class="st">.weight'</span>, n):</span>
+<span id="cb2-17"><a href="#cb2-17" aria-hidden="true" tabindex="-1"></a>                kaiming_normal_(p, nonlinearity<span class="op">=</span><span class="st">'relu'</span>)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+</details>
+</div>
+<p>It implements the following architecture:</p>
+<div class="cell" data-layout-align="default">
+<div class="cell-output-display">
+<div>
+<p></p><figure class="figure"><p></p>
+<div>
+<pre class="mermaid mermaid-js">flowchart LR
+  A(("
+  Input
+  (bs, in_c, h, w)")) --&gt; B["
+  Conv(3x3)
+  in_c -&gt; out_c"]
+  B --&gt; C["BatchNorm2d"]
+  C --&gt; D["ReLU"]
+  D --&gt; E["
+  Conv(3x3)
+  out_c -&gt; out_c"]
+  E --&gt; F["BatchNorm2d"]
+  F --&gt; G["ReLU"]
+  G --&gt; H(("
+  Output
+  (bs, out_c, h, w)"))
+</pre>
+</div>
+<p></p></figure><p></p>
+</div>
+</div>
+</div>
+<p>Here is an example on how to use it:</p>
+<div id="eb46d424-aa62-4686-b746-b5f144063376" class="cell">
+<div class="sourceCode cell-code" id="cb3"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb3-1"><a href="#cb3-1" aria-hidden="true" tabindex="-1"></a>bs, in_c, out_c, h, w <span class="op">=</span> <span class="dv">1</span>, <span class="dv">5</span>, <span class="dv">64</span>, <span class="dv">64</span>, <span class="dv">512</span></span>
+<span id="cb3-2"><a href="#cb3-2" aria-hidden="true" tabindex="-1"></a>inp <span class="op">=</span> torch.randn(bs, in_c, h, w)</span>
+<span id="cb3-3"><a href="#cb3-3" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb3-4"><a href="#cb3-4" aria-hidden="true" tabindex="-1"></a>b <span class="op">=</span> Block(in_c, out_c)</span>
+<span id="cb3-5"><a href="#cb3-5" aria-hidden="true" tabindex="-1"></a>outp <span class="op">=</span> b(inp)</span>
+<span id="cb3-6"><a href="#cb3-6" aria-hidden="true" tabindex="-1"></a><span class="cf">assert</span> outp.shape <span class="op">==</span> (bs, out_c, h, w)</span>
+<span id="cb3-7"><a href="#cb3-7" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(outp.shape, <span class="ss">f'== (</span><span class="sc">{</span>bs<span class="sc">}</span><span class="ss">, </span><span class="sc">{</span>out_c<span class="sc">}</span><span class="ss">, </span><span class="sc">{</span>h<span class="sc">}</span><span class="ss">, </span><span class="sc">{</span>w<span class="sc">}</span><span class="ss">)'</span>)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output cell-output-stdout">
+<pre><code>torch.Size([1, 64, 64, 512]) == (1, 64, 64, 512)</code></pre>
+</div>
+</div>
+<p>It initializes the weights from the conv layers following the <a href="https://pytorch.org/docs/stable/nn.init.html#torch.nn.init.kaiming_normal_">kaiming_normal_</a> algorithm in fan_in mode as described in <a href="https://arxiv.org/abs/1505.04597">U-Net</a> (page 5).</p>
+<div id="b453ff41-54bd-4c8b-81cf-75e58d906f71" class="cell">
+<div class="sourceCode cell-code" id="cb5"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb5-1"><a href="#cb5-1" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> matplotlib <span class="im">import</span> pyplot <span class="im">as</span> plt</span>
+<span id="cb5-2"><a href="#cb5-2" aria-hidden="true" tabindex="-1"></a><span class="im">import</span> matplotlib.colors <span class="im">as</span> mcolors</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+</div>
+<div id="38c5054f-da2d-4da2-8f27-34bc527b3a4f" class="cell">
+<div class="sourceCode cell-code" id="cb6"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb6-1"><a href="#cb6-1" aria-hidden="true" tabindex="-1"></a>colors_list <span class="op">=</span> <span class="bu">list</span>(mcolors.TABLEAU_COLORS)</span>
+<span id="cb6-2"><a href="#cb6-2" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb6-3"><a href="#cb6-3" aria-hidden="true" tabindex="-1"></a><span class="kw">def</span> plot_param_dists(net, param_re_pattern, nonlinearity_gain):</span>
+<span id="cb6-4"><a href="#cb6-4" aria-hidden="true" tabindex="-1"></a>    color_idx <span class="op">=</span> <span class="dv">0</span></span>
+<span id="cb6-5"><a href="#cb6-5" aria-hidden="true" tabindex="-1"></a>    <span class="cf">for</span> n, p <span class="kw">in</span> net.named_parameters():</span>
+<span id="cb6-6"><a href="#cb6-6" aria-hidden="true" tabindex="-1"></a>        <span class="cf">if</span> re.search(param_re_pattern, n):</span>
+<span id="cb6-7"><a href="#cb6-7" aria-hidden="true" tabindex="-1"></a>            x_range <span class="op">=</span> <span class="fl">1.1</span><span class="op">*</span>p.data.<span class="bu">max</span>()</span>
+<span id="cb6-8"><a href="#cb6-8" aria-hidden="true" tabindex="-1"></a>            <span class="co">## kaiming normal dist</span></span>
+<span id="cb6-9"><a href="#cb6-9" aria-hidden="true" tabindex="-1"></a>            fan_in <span class="op">=</span> p.shape[<span class="dv">1</span>]<span class="op">*</span>p.shape[<span class="dv">2</span>]<span class="op">*</span>p.shape[<span class="dv">3</span>]</span>
+<span id="cb6-10"><a href="#cb6-10" aria-hidden="true" tabindex="-1"></a>            mu, sigma <span class="op">=</span> <span class="fl">0.</span>, np.sqrt(nonlinearity_gain<span class="op">/</span>fan_in)</span>
+<span id="cb6-11"><a href="#cb6-11" aria-hidden="true" tabindex="-1"></a>            x <span class="op">=</span> np.linspace(<span class="op">-</span>x_range, x_range, <span class="dv">100</span>)</span>
+<span id="cb6-12"><a href="#cb6-12" aria-hidden="true" tabindex="-1"></a>            y <span class="op">=</span> ((<span class="fl">1.</span><span class="op">/</span>(np.sqrt(<span class="dv">2</span><span class="op">*</span>np.pi)<span class="op">*</span>sigma))<span class="op">*</span>np.exp(<span class="op">-</span><span class="fl">0.5</span><span class="op">*</span>((<span class="fl">1.</span><span class="op">/</span>sigma)<span class="op">*</span>(x <span class="op">-</span> mu))<span class="op">**</span><span class="dv">2</span>))</span>
+<span id="cb6-13"><a href="#cb6-13" aria-hidden="true" tabindex="-1"></a>            plt.plot(x, y, <span class="st">'--'</span>, color<span class="op">=</span>colors_list[color_idx], label<span class="op">=</span><span class="st">'Expected '</span><span class="op">+</span>n)</span>
+<span id="cb6-14"><a href="#cb6-14" aria-hidden="true" tabindex="-1"></a>            <span class="co">## sampled weight dist</span></span>
+<span id="cb6-15"><a href="#cb6-15" aria-hidden="true" tabindex="-1"></a>            plt.hist(p.view(<span class="op">-</span><span class="dv">1</span>).data, <span class="dv">30</span>, density<span class="op">=</span><span class="va">True</span>, alpha<span class="op">=</span><span class="fl">0.5</span>, color<span class="op">=</span>colors_list[color_idx], label<span class="op">=</span><span class="st">'Actual '</span><span class="op">+</span>n)</span>
+<span id="cb6-16"><a href="#cb6-16" aria-hidden="true" tabindex="-1"></a>            color_idx <span class="op">+=</span> <span class="dv">1</span></span>
+<span id="cb6-17"><a href="#cb6-17" aria-hidden="true" tabindex="-1"></a>    plt.legend()<span class="op">;</span></span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+</div>
+<div id="77662905-e1d2-4365-a865-f9e60e90f60a" class="cell">
+<div class="sourceCode cell-code" id="cb7"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb7-1"><a href="#cb7-1" aria-hidden="true" tabindex="-1"></a>plot_param_dists(b, <span class="st">'conv</span><span class="er">\</span><span class="st">d</span><span class="er">\</span><span class="st">.weight'</span>, <span class="fl">2.</span>)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output cell-output-display">
+<div>
+<figure class="figure">
+<p><img src="01_biasutti2019riu_files/figure-html/cell-7-output-1.png" class="img-fluid figure-img"></p>
+</figure>
+</div>
+</div>
+</div>
+<div id="78c09fbc-af48-4135-8270-9f1dc911b9ed" class="cell">
+<div class="sourceCode cell-code" id="cb8"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb8-1"><a href="#cb8-1" aria-hidden="true" tabindex="-1"></a><span class="cf">for</span> n, p <span class="kw">in</span> b.named_parameters():</span>
+<span id="cb8-2"><a href="#cb8-2" aria-hidden="true" tabindex="-1"></a>    <span class="cf">if</span> re.search(<span class="st">'conv</span><span class="er">\</span><span class="st">d</span><span class="er">\</span><span class="st">.weight'</span>, n):</span>
+<span id="cb8-3"><a href="#cb8-3" aria-hidden="true" tabindex="-1"></a>        fan_in <span class="op">=</span> p.shape[<span class="dv">1</span>]<span class="op">*</span>p.shape[<span class="dv">2</span>]<span class="op">*</span>p.shape[<span class="dv">3</span>]</span>
+<span id="cb8-4"><a href="#cb8-4" aria-hidden="true" tabindex="-1"></a>        mu, sigma <span class="op">=</span> <span class="fl">0.</span>, np.sqrt(<span class="fl">2.</span><span class="op">/</span>fan_in)</span>
+<span id="cb8-5"><a href="#cb8-5" aria-hidden="true" tabindex="-1"></a>        p_data <span class="op">=</span> p.view(<span class="op">-</span><span class="dv">1</span>).data</span>
+<span id="cb8-6"><a href="#cb8-6" aria-hidden="true" tabindex="-1"></a>        <span class="cf">assert</span> <span class="bu">abs</span>(mu <span class="op">-</span> p_data.mean()) <span class="op">&lt;</span> <span class="fl">1e-2</span></span>
+<span id="cb8-7"><a href="#cb8-7" aria-hidden="true" tabindex="-1"></a>        <span class="cf">assert</span> <span class="bu">abs</span>(sigma <span class="op">-</span> p_data.std()) <span class="op">&lt;</span> <span class="fl">1e-2</span></span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+</div>
+<hr>
+<p><a href="https://github.com/AIR-UFG/colorcloud/blob/main/colorcloud/biasutti2019riu.py#L40" target="_blank" style="float:right; font-size:smaller">source</a></p>
+</section>
+<section id="encoder" class="level3">
+<h3 class="anchored" data-anchor-id="encoder">Encoder</h3>
+<blockquote class="blockquote">
+<pre><code> Encoder (channels=(5, 64, 128, 256, 512, 1024))</code></pre>
+</blockquote>
+<p><em>RIU-Net encoder architecture.</em></p>
+<div id="3c1e51fb-d9ee-48f3-a4c9-b6a26e8788a8" class="cell">
+<details open="" class="code-fold">
+<summary>Exported source</summary>
+<div class="sourceCode cell-code" id="cb10"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb10-1"><a href="#cb10-1" aria-hidden="true" tabindex="-1"></a><span class="kw">class</span> Encoder(Module):</span>
+<span id="cb10-2"><a href="#cb10-2" aria-hidden="true" tabindex="-1"></a>    <span class="co">"RIU-Net encoder architecture."</span></span>
+<span id="cb10-3"><a href="#cb10-3" aria-hidden="true" tabindex="-1"></a>    <span class="kw">def</span> <span class="fu">__init__</span>(<span class="va">self</span>, channels<span class="op">=</span>(<span class="dv">5</span>, <span class="dv">64</span>, <span class="dv">128</span>, <span class="dv">256</span>, <span class="dv">512</span>, <span class="dv">1024</span>)):</span>
+<span id="cb10-4"><a href="#cb10-4" aria-hidden="true" tabindex="-1"></a>        <span class="bu">super</span>().<span class="fu">__init__</span>()</span>
+<span id="cb10-5"><a href="#cb10-5" aria-hidden="true" tabindex="-1"></a>        <span class="va">self</span>.blocks <span class="op">=</span> ModuleList(</span>
+<span id="cb10-6"><a href="#cb10-6" aria-hidden="true" tabindex="-1"></a>            [Block(channels[i], channels[i<span class="op">+</span><span class="dv">1</span>]) <span class="cf">for</span> i <span class="kw">in</span> <span class="bu">range</span>(<span class="bu">len</span>(channels)<span class="op">-</span><span class="dv">1</span>)]</span>
+<span id="cb10-7"><a href="#cb10-7" aria-hidden="true" tabindex="-1"></a>        )</span>
+<span id="cb10-8"><a href="#cb10-8" aria-hidden="true" tabindex="-1"></a>    </span>
+<span id="cb10-9"><a href="#cb10-9" aria-hidden="true" tabindex="-1"></a>    <span class="kw">def</span> forward(<span class="va">self</span>, x):</span>
+<span id="cb10-10"><a href="#cb10-10" aria-hidden="true" tabindex="-1"></a>        enc_features <span class="op">=</span> []</span>
+<span id="cb10-11"><a href="#cb10-11" aria-hidden="true" tabindex="-1"></a>        <span class="cf">for</span> block <span class="kw">in</span> <span class="va">self</span>.blocks:</span>
+<span id="cb10-12"><a href="#cb10-12" aria-hidden="true" tabindex="-1"></a>            x <span class="op">=</span> block(x)</span>
+<span id="cb10-13"><a href="#cb10-13" aria-hidden="true" tabindex="-1"></a>            enc_features.append(x)</span>
+<span id="cb10-14"><a href="#cb10-14" aria-hidden="true" tabindex="-1"></a>            x <span class="op">=</span> F.max_pool2d(x, <span class="dv">2</span>)</span>
+<span id="cb10-15"><a href="#cb10-15" aria-hidden="true" tabindex="-1"></a>        <span class="cf">return</span> enc_features</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+</details>
+</div>
+<p>It implements the following architecture:</p>
+<div class="cell" data-layout-align="default">
+<div class="cell-output-display">
+<div>
+<p></p><figure class="figure"><p></p>
+<div>
+<pre class="mermaid mermaid-js">flowchart LR
+  A(("
+  Input
+  (bs, 5, h, w)")) --&gt; B["
+  Block
+  5 -&gt; 64"]
+  B --&gt; C["MaxPool(2x2)"]
+  C --&gt; D["
+  Block
+  64 -&gt; 128"]
+  D --&gt; E["MaxPool(2x2)"]
+  E --&gt; F["
+  Block
+  128 -&gt; 256"]
+  F --&gt; G["MaxPool(2x2)"]
+  G --&gt; H["
+  Block
+  256 -&gt; 512"]
+  H --&gt; I["MaxPool(2x2)"]
+  I --&gt; J["
+  Block
+  512 -&gt; 1024"]
+  B --&gt; L(("
+  Output
+  [(bs, 64, h, w),
+  (bs, 128, h/2, w/2),
+  (bs, 256, h/4, w/4),
+  (bs, 512, h/8, w/8),
+  (bs, 1024, h/16, w/16)]"))
+  D --&gt; L
+  F --&gt; L
+  H --&gt; L
+  J --&gt; L
+</pre>
+</div>
+<p></p></figure><p></p>
+</div>
+</div>
+</div>
+<p>Here is an example on how to use it:</p>
+<div id="0961c1d1-19f7-402e-bdb5-e1b12dcff13f" class="cell">
+<div class="sourceCode cell-code" id="cb11"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb11-1"><a href="#cb11-1" aria-hidden="true" tabindex="-1"></a>enc <span class="op">=</span> Encoder()</span>
+<span id="cb11-2"><a href="#cb11-2" aria-hidden="true" tabindex="-1"></a>outp <span class="op">=</span> enc(inp)</span>
+<span id="cb11-3"><a href="#cb11-3" aria-hidden="true" tabindex="-1"></a>[o.shape <span class="cf">for</span> o <span class="kw">in</span> outp]</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output cell-output-display">
+<pre><code>[torch.Size([1, 64, 64, 512]),
+ torch.Size([1, 128, 32, 256]),
+ torch.Size([1, 256, 16, 128]),
+ torch.Size([1, 512, 8, 64]),
+ torch.Size([1, 1024, 4, 32])]</code></pre>
+</div>
+</div>
+<p>For the decoder, the paper mentions the application of “up-convolutions”, which were first defined in <a href="https://arxiv.org/abs/1505.04597">U-Net</a> as:</p>
+<blockquote class="blockquote">
+<p>“an upsampling of the feature map followed by a 2x2 convolution (“up-convolution”)”</p>
+</blockquote>
+<p>Our implementation changes the 2x2 convolution to a 3x3 one to avoid croping the feature maps to handle shape mismatches with the encoder skip connections.</p>
+<hr>
+<p><a href="https://github.com/AIR-UFG/colorcloud/blob/main/colorcloud/biasutti2019riu.py#L57" target="_blank" style="float:right; font-size:smaller">source</a></p>
+</section>
+<section id="upconv" class="level3">
+<h3 class="anchored" data-anchor-id="upconv">UpConv</h3>
+<blockquote class="blockquote">
+<pre><code> UpConv (in_channels, out_channels)</code></pre>
+</blockquote>
+<p><em>Up-convolution operation adapted from <a href="https://arxiv.org/abs/1505.04597">U-Net</a>.</em></p>
+<div id="384f6bee-ae0b-4d6d-be00-4ffadaae30fd" class="cell">
+<details open="" class="code-fold">
+<summary>Exported source</summary>
+<div class="sourceCode cell-code" id="cb14"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb14-1"><a href="#cb14-1" aria-hidden="true" tabindex="-1"></a><span class="kw">class</span> UpConv(Sequential):</span>
+<span id="cb14-2"><a href="#cb14-2" aria-hidden="true" tabindex="-1"></a>    <span class="co">"Up-convolution operation adapted from [U-Net](https://arxiv.org/abs/1505.04597)."</span></span>
+<span id="cb14-3"><a href="#cb14-3" aria-hidden="true" tabindex="-1"></a>    <span class="kw">def</span> <span class="fu">__init__</span>(<span class="va">self</span>, in_channels, out_channels):</span>
+<span id="cb14-4"><a href="#cb14-4" aria-hidden="true" tabindex="-1"></a>        <span class="bu">super</span>().<span class="fu">__init__</span>(OrderedDict([</span>
+<span id="cb14-5"><a href="#cb14-5" aria-hidden="true" tabindex="-1"></a>            (<span class="ss">f'upsample'</span>, Upsample(scale_factor<span class="op">=</span><span class="dv">2</span>)),</span>
+<span id="cb14-6"><a href="#cb14-6" aria-hidden="true" tabindex="-1"></a>            (<span class="ss">f'conv'</span>, Conv2d(in_channels, out_channels, <span class="dv">3</span>, <span class="dv">1</span>, <span class="dv">1</span>, bias<span class="op">=</span><span class="va">False</span>, padding_mode<span class="op">=</span><span class="st">'circular'</span>)),</span>
+<span id="cb14-7"><a href="#cb14-7" aria-hidden="true" tabindex="-1"></a>            (<span class="ss">f'bn'</span>, BatchNorm2d(out_channels, momentum<span class="op">=</span><span class="fl">0.01</span>)),</span>
+<span id="cb14-8"><a href="#cb14-8" aria-hidden="true" tabindex="-1"></a>        ]))</span>
+<span id="cb14-9"><a href="#cb14-9" aria-hidden="true" tabindex="-1"></a>        <span class="va">self</span>.init_params()</span>
+<span id="cb14-10"><a href="#cb14-10" aria-hidden="true" tabindex="-1"></a>    </span>
+<span id="cb14-11"><a href="#cb14-11" aria-hidden="true" tabindex="-1"></a>    <span class="kw">def</span> init_params(<span class="va">self</span>):</span>
+<span id="cb14-12"><a href="#cb14-12" aria-hidden="true" tabindex="-1"></a>        <span class="cf">for</span> n, p <span class="kw">in</span> <span class="va">self</span>.named_parameters():</span>
+<span id="cb14-13"><a href="#cb14-13" aria-hidden="true" tabindex="-1"></a>            <span class="cf">if</span> re.search(<span class="st">'conv.weight'</span>, n):</span>
+<span id="cb14-14"><a href="#cb14-14" aria-hidden="true" tabindex="-1"></a>                kaiming_normal_(p, nonlinearity<span class="op">=</span><span class="st">'linear'</span>)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+</details>
+</div>
+<p>Here is an example on how to use it:</p>
+<div id="0a3b2f8e-3f3f-4829-b11f-f96a9f33b0a4" class="cell">
+<div class="sourceCode cell-code" id="cb15"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb15-1"><a href="#cb15-1" aria-hidden="true" tabindex="-1"></a>upc <span class="op">=</span> UpConv(<span class="dv">1024</span>, <span class="dv">512</span>)</span>
+<span id="cb15-2"><a href="#cb15-2" aria-hidden="true" tabindex="-1"></a>outp <span class="op">=</span> enc(inp)</span>
+<span id="cb15-3"><a href="#cb15-3" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="ss">f'before: </span><span class="sc">{</span>outp[<span class="op">-</span><span class="dv">1</span>]<span class="sc">.</span>shape<span class="sc">}</span><span class="ss">'</span>)</span>
+<span id="cb15-4"><a href="#cb15-4" aria-hidden="true" tabindex="-1"></a>outp <span class="op">=</span> upc(outp[<span class="op">-</span><span class="dv">1</span>])</span>
+<span id="cb15-5"><a href="#cb15-5" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="ss">f'after: </span><span class="sc">{</span>outp<span class="sc">.</span>shape<span class="sc">}</span><span class="ss">'</span>)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output cell-output-stdout">
+<pre><code>before: torch.Size([1, 1024, 4, 32])
+after: torch.Size([1, 512, 8, 64])</code></pre>
+</div>
+</div>
+<hr>
+<p><a href="https://github.com/AIR-UFG/colorcloud/blob/main/colorcloud/biasutti2019riu.py#L73" target="_blank" style="float:right; font-size:smaller">source</a></p>
+</section>
+<section id="decoder" class="level3">
+<h3 class="anchored" data-anchor-id="decoder">Decoder</h3>
+<blockquote class="blockquote">
+<pre><code> Decoder (channels=(1024, 512, 256, 128, 64))</code></pre>
+</blockquote>
+<p><em>RIU-Net decoder architecture.</em></p>
+<div id="0e039c48-213f-4411-8d6d-884ecb8f7dc1" class="cell">
+<details open="" class="code-fold">
+<summary>Exported source</summary>
+<div class="sourceCode cell-code" id="cb18"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb18-1"><a href="#cb18-1" aria-hidden="true" tabindex="-1"></a><span class="kw">class</span> Decoder(Module):</span>
+<span id="cb18-2"><a href="#cb18-2" aria-hidden="true" tabindex="-1"></a>    <span class="co">"RIU-Net decoder architecture."</span></span>
+<span id="cb18-3"><a href="#cb18-3" aria-hidden="true" tabindex="-1"></a>    <span class="kw">def</span> <span class="fu">__init__</span>(<span class="va">self</span>, channels<span class="op">=</span>(<span class="dv">1024</span>, <span class="dv">512</span>, <span class="dv">256</span>, <span class="dv">128</span>, <span class="dv">64</span>)):</span>
+<span id="cb18-4"><a href="#cb18-4" aria-hidden="true" tabindex="-1"></a>        <span class="bu">super</span>().<span class="fu">__init__</span>()</span>
+<span id="cb18-5"><a href="#cb18-5" aria-hidden="true" tabindex="-1"></a>        <span class="va">self</span>.upconvs <span class="op">=</span> ModuleList(</span>
+<span id="cb18-6"><a href="#cb18-6" aria-hidden="true" tabindex="-1"></a>            [UpConv(channels[i], channels[i<span class="op">+</span><span class="dv">1</span>]) <span class="cf">for</span> i <span class="kw">in</span> <span class="bu">range</span>(<span class="bu">len</span>(channels)<span class="op">-</span><span class="dv">1</span>)]</span>
+<span id="cb18-7"><a href="#cb18-7" aria-hidden="true" tabindex="-1"></a>        )</span>
+<span id="cb18-8"><a href="#cb18-8" aria-hidden="true" tabindex="-1"></a>        <span class="va">self</span>.blocks <span class="op">=</span> ModuleList(</span>
+<span id="cb18-9"><a href="#cb18-9" aria-hidden="true" tabindex="-1"></a>            [Block(channels[i], channels[i<span class="op">+</span><span class="dv">1</span>]) <span class="cf">for</span> i <span class="kw">in</span> <span class="bu">range</span>(<span class="bu">len</span>(channels)<span class="op">-</span><span class="dv">1</span>)]</span>
+<span id="cb18-10"><a href="#cb18-10" aria-hidden="true" tabindex="-1"></a>        )</span>
+<span id="cb18-11"><a href="#cb18-11" aria-hidden="true" tabindex="-1"></a>    </span>
+<span id="cb18-12"><a href="#cb18-12" aria-hidden="true" tabindex="-1"></a>    <span class="kw">def</span> forward(<span class="va">self</span>, enc_features):</span>
+<span id="cb18-13"><a href="#cb18-13" aria-hidden="true" tabindex="-1"></a>        x <span class="op">=</span> enc_features[<span class="op">-</span><span class="dv">1</span>]</span>
+<span id="cb18-14"><a href="#cb18-14" aria-hidden="true" tabindex="-1"></a>        <span class="cf">for</span> i, (upconv, block) <span class="kw">in</span> <span class="bu">enumerate</span>(<span class="bu">zip</span>(<span class="va">self</span>.upconvs, <span class="va">self</span>.blocks)):</span>
+<span id="cb18-15"><a href="#cb18-15" aria-hidden="true" tabindex="-1"></a>            x <span class="op">=</span> upconv(x)</span>
+<span id="cb18-16"><a href="#cb18-16" aria-hidden="true" tabindex="-1"></a>            x <span class="op">=</span> torch.cat([x, enc_features[<span class="op">-</span>(i<span class="op">+</span><span class="dv">2</span>)]], dim<span class="op">=</span><span class="dv">1</span>)</span>
+<span id="cb18-17"><a href="#cb18-17" aria-hidden="true" tabindex="-1"></a>            x <span class="op">=</span> block(x)</span>
+<span id="cb18-18"><a href="#cb18-18" aria-hidden="true" tabindex="-1"></a>        <span class="cf">return</span> x</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+</details>
+</div>
+<p>It implements the following architecture:</p>
+<div class="cell" data-layout-align="default">
+<div class="cell-output-display">
+<div>
+<p></p><figure class="figure"><p></p>
+<div>
+<pre class="mermaid mermaid-js">flowchart LR
+  A(("
+  Input
+  [(bs, 1024, h/16, w/16),
+  (bs, 512, h/8, w/8),
+  (bs, 256, h/4, w/4),
+  (bs, 128, h/2, w/2),
+  (bs, 64, h, w)]")) --&gt; B["
+  UpConv
+  1024 -&gt; 512"]
+  B --&gt; C["
+  Block
+  concat(512,512) -&gt; 512"]
+  A --&gt; C
+  C --&gt; D["
+  UpConv
+  512 -&gt; 256"]
+  D --&gt; E["
+  Block
+  concat(256,256) -&gt; 256"]
+  A --&gt; E
+  E --&gt; F["
+  UpConv
+  256 -&gt; 128"]
+  F --&gt; G["
+  Block
+  concat(128,128) -&gt; 128"]
+  A --&gt; G
+  G --&gt; H["
+  UpConv
+  128 -&gt; 64"]
+  H --&gt; I["
+  Block
+  concat(64,64) -&gt; 64"]
+  A --&gt; I
+  I --&gt; J(("
+  Output
+  (bs, 64, h, w)"))
+</pre>
+</div>
+<p></p></figure><p></p>
+</div>
+</div>
+</div>
+<p>Here is an example on how to use it:</p>
+<div id="e95b30e7-5000-462b-8a1e-c46c9ad5f210" class="cell">
+<div class="sourceCode cell-code" id="cb19"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb19-1"><a href="#cb19-1" aria-hidden="true" tabindex="-1"></a>dec <span class="op">=</span> Decoder()</span>
+<span id="cb19-2"><a href="#cb19-2" aria-hidden="true" tabindex="-1"></a>outp <span class="op">=</span> enc(inp)</span>
+<span id="cb19-3"><a href="#cb19-3" aria-hidden="true" tabindex="-1"></a>fts <span class="op">=</span> dec(outp)</span>
+<span id="cb19-4"><a href="#cb19-4" aria-hidden="true" tabindex="-1"></a><span class="cf">assert</span> fts.shape <span class="op">==</span> (bs, out_c, h, w)</span>
+<span id="cb19-5"><a href="#cb19-5" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(fts.shape, <span class="ss">f'== (</span><span class="sc">{</span>bs<span class="sc">}</span><span class="ss">, </span><span class="sc">{</span>out_c<span class="sc">}</span><span class="ss">, </span><span class="sc">{</span>h<span class="sc">}</span><span class="ss">, </span><span class="sc">{</span>w<span class="sc">}</span><span class="ss">)'</span>)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output cell-output-stdout">
+<pre><code>torch.Size([1, 64, 64, 512]) == (1, 64, 64, 512)</code></pre>
+</div>
+</div>
+<p>It initializes the weights from the upconv layers following the <a href="https://pytorch.org/docs/stable/nn.init.html#torch.nn.init.kaiming_normal_">kaiming_normal_</a> algorithm in fan_in mode and <em>nonlinearity</em> set as ‘linear’, since no relu layer is used in the operation.</p>
+<div id="483a5f59-742e-41f8-932c-aec3d6e08b04" class="cell">
+<div class="sourceCode cell-code" id="cb21"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb21-1"><a href="#cb21-1" aria-hidden="true" tabindex="-1"></a>plot_param_dists(dec, <span class="st">'upconvs</span><span class="er">\</span><span class="st">.</span><span class="er">\</span><span class="st">d</span><span class="er">\</span><span class="st">.conv</span><span class="er">\</span><span class="st">.weight'</span>, <span class="fl">1.</span>)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output cell-output-display">
+<div>
+<figure class="figure">
+<p><img src="01_biasutti2019riu_files/figure-html/cell-18-output-1.png" class="img-fluid figure-img"></p>
+</figure>
+</div>
+</div>
+</div>
+<div id="d2bcdc3f-34b8-4f34-afd9-0f9c7dd1b915" class="cell">
+<div class="sourceCode cell-code" id="cb22"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb22-1"><a href="#cb22-1" aria-hidden="true" tabindex="-1"></a><span class="cf">for</span> n, p <span class="kw">in</span> dec.named_parameters():</span>
+<span id="cb22-2"><a href="#cb22-2" aria-hidden="true" tabindex="-1"></a>    <span class="cf">if</span> re.search(<span class="st">'upconvs</span><span class="er">\</span><span class="st">.</span><span class="er">\</span><span class="st">d</span><span class="er">\</span><span class="st">.conv</span><span class="er">\</span><span class="st">.weight'</span>, n):</span>
+<span id="cb22-3"><a href="#cb22-3" aria-hidden="true" tabindex="-1"></a>        fan_in <span class="op">=</span> p.shape[<span class="dv">1</span>]<span class="op">*</span>p.shape[<span class="dv">2</span>]<span class="op">*</span>p.shape[<span class="dv">3</span>]</span>
+<span id="cb22-4"><a href="#cb22-4" aria-hidden="true" tabindex="-1"></a>        mu, sigma <span class="op">=</span> <span class="fl">0.</span>, np.sqrt(<span class="fl">1.</span><span class="op">/</span>fan_in)</span>
+<span id="cb22-5"><a href="#cb22-5" aria-hidden="true" tabindex="-1"></a>        p_data <span class="op">=</span> p.view(<span class="op">-</span><span class="dv">1</span>).data</span>
+<span id="cb22-6"><a href="#cb22-6" aria-hidden="true" tabindex="-1"></a>        <span class="cf">assert</span> <span class="bu">abs</span>(mu <span class="op">-</span> p_data.mean()) <span class="op">&lt;</span> <span class="fl">1e-3</span></span>
+<span id="cb22-7"><a href="#cb22-7" aria-hidden="true" tabindex="-1"></a>        <span class="cf">assert</span> <span class="bu">abs</span>(sigma <span class="op">-</span> p_data.std()) <span class="op">&lt;</span> <span class="fl">1e-3</span></span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+</div>
+<hr>
+<p><a href="https://github.com/AIR-UFG/colorcloud/blob/main/colorcloud/biasutti2019riu.py#L93" target="_blank" style="float:right; font-size:smaller">source</a></p>
+</section>
+<section id="riunet" class="level3">
+<h3 class="anchored" data-anchor-id="riunet">RIUNet</h3>
+<blockquote class="blockquote">
+<pre><code> RIUNet (in_channels=5, hidden_channels=(64, 128, 256, 512, 1024),
+         n_classes=20)</code></pre>
+</blockquote>
+<p><em>RIU-Net complete architecture.</em></p>
+<div id="6a2b5b8a-c437-4e65-8027-182568366723" class="cell">
+<details open="" class="code-fold">
+<summary>Exported source</summary>
+<div class="sourceCode cell-code" id="cb24"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb24-1"><a href="#cb24-1" aria-hidden="true" tabindex="-1"></a><span class="kw">class</span> RIUNet(Module):</span>
+<span id="cb24-2"><a href="#cb24-2" aria-hidden="true" tabindex="-1"></a>    <span class="co">"RIU-Net complete architecture."</span></span>
+<span id="cb24-3"><a href="#cb24-3" aria-hidden="true" tabindex="-1"></a>    <span class="kw">def</span> <span class="fu">__init__</span>(<span class="va">self</span>, in_channels<span class="op">=</span><span class="dv">5</span>, hidden_channels<span class="op">=</span>(<span class="dv">64</span>, <span class="dv">128</span>, <span class="dv">256</span>, <span class="dv">512</span>, <span class="dv">1024</span>), n_classes<span class="op">=</span><span class="dv">20</span>):</span>
+<span id="cb24-4"><a href="#cb24-4" aria-hidden="true" tabindex="-1"></a>        <span class="bu">super</span>().<span class="fu">__init__</span>()</span>
+<span id="cb24-5"><a href="#cb24-5" aria-hidden="true" tabindex="-1"></a>        <span class="va">self</span>.n_classes <span class="op">=</span> n_classes</span>
+<span id="cb24-6"><a href="#cb24-6" aria-hidden="true" tabindex="-1"></a>        <span class="va">self</span>.input_norm <span class="op">=</span> BatchNorm2d(in_channels, affine<span class="op">=</span><span class="va">False</span>, momentum<span class="op">=</span><span class="va">None</span>)</span>
+<span id="cb24-7"><a href="#cb24-7" aria-hidden="true" tabindex="-1"></a>        <span class="va">self</span>.backbone <span class="op">=</span> Sequential(OrderedDict([</span>
+<span id="cb24-8"><a href="#cb24-8" aria-hidden="true" tabindex="-1"></a>            (<span class="ss">f'enc'</span>, Encoder((in_channels, <span class="op">*</span>hidden_channels))),</span>
+<span id="cb24-9"><a href="#cb24-9" aria-hidden="true" tabindex="-1"></a>            (<span class="ss">f'dec'</span>, Decoder(hidden_channels[::<span class="op">-</span><span class="dv">1</span>]))</span>
+<span id="cb24-10"><a href="#cb24-10" aria-hidden="true" tabindex="-1"></a>        ]))</span>
+<span id="cb24-11"><a href="#cb24-11" aria-hidden="true" tabindex="-1"></a>        <span class="va">self</span>.head <span class="op">=</span> Conv2d(hidden_channels[<span class="dv">0</span>], n_classes, <span class="dv">1</span>)</span>
+<span id="cb24-12"><a href="#cb24-12" aria-hidden="true" tabindex="-1"></a>        <span class="va">self</span>.init_params()</span>
+<span id="cb24-13"><a href="#cb24-13" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb24-14"><a href="#cb24-14" aria-hidden="true" tabindex="-1"></a>    <span class="kw">def</span> init_params(<span class="va">self</span>):</span>
+<span id="cb24-15"><a href="#cb24-15" aria-hidden="true" tabindex="-1"></a>        <span class="cf">for</span> n, p <span class="kw">in</span> <span class="va">self</span>.named_parameters():</span>
+<span id="cb24-16"><a href="#cb24-16" aria-hidden="true" tabindex="-1"></a>            <span class="cf">if</span> re.search(<span class="st">'head</span><span class="er">\</span><span class="st">.weight'</span>, n):</span>
+<span id="cb24-17"><a href="#cb24-17" aria-hidden="true" tabindex="-1"></a>                normal_(p, std<span class="op">=</span><span class="fl">1e-2</span>)</span>
+<span id="cb24-18"><a href="#cb24-18" aria-hidden="true" tabindex="-1"></a>            <span class="cf">if</span> re.search(<span class="st">'head</span><span class="er">\</span><span class="st">.bias'</span>, n):</span>
+<span id="cb24-19"><a href="#cb24-19" aria-hidden="true" tabindex="-1"></a>                zeros_(p)</span>
+<span id="cb24-20"><a href="#cb24-20" aria-hidden="true" tabindex="-1"></a>    </span>
+<span id="cb24-21"><a href="#cb24-21" aria-hidden="true" tabindex="-1"></a>    <span class="kw">def</span> forward(<span class="va">self</span>, x):</span>
+<span id="cb24-22"><a href="#cb24-22" aria-hidden="true" tabindex="-1"></a>        x <span class="op">=</span> <span class="va">self</span>.input_norm(x)</span>
+<span id="cb24-23"><a href="#cb24-23" aria-hidden="true" tabindex="-1"></a>        features <span class="op">=</span> <span class="va">self</span>.backbone(x)</span>
+<span id="cb24-24"><a href="#cb24-24" aria-hidden="true" tabindex="-1"></a>        prediction <span class="op">=</span> <span class="va">self</span>.head(features)</span>
+<span id="cb24-25"><a href="#cb24-25" aria-hidden="true" tabindex="-1"></a>        </span>
+<span id="cb24-26"><a href="#cb24-26" aria-hidden="true" tabindex="-1"></a>        <span class="cf">return</span> prediction</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+</details>
+</div>
+<p>We slightly changed it to accept 5 input channels (i.e.&nbsp;x, y, z, depth and reflectance) instead of the 2 (depth and elevation) proposed in the original paper.</p>
+<p>It implements the following architecture:</p>
+<div class="cell" data-layout-align="default">
+<div class="cell-output-display">
+<div>
+<p></p><figure class="figure"><p></p>
+<div>
+<pre class="mermaid mermaid-js">flowchart LR
+  A(("
+  Input
+  (bs, 5, h, w)")) --&gt; B["Encoder"]
+  B --&gt; C["Decoder"]
+  C --&gt; D["
+  Conv(1x1)
+  64 -&gt; 20"]
+  D --&gt; E(("
+  Output
+  (bs, 20, h, w)"))
+</pre>
+</div>
+<p></p></figure><p></p>
+</div>
+</div>
+</div>
+<p>Here is an example on how to use it:</p>
+<div id="4ffcce5f-3640-4f92-9f8d-f2e47389dbe2" class="cell">
+<div class="sourceCode cell-code" id="cb25"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb25-1"><a href="#cb25-1" aria-hidden="true" tabindex="-1"></a>n_classes<span class="op">=</span><span class="dv">20</span></span>
+<span id="cb25-2"><a href="#cb25-2" aria-hidden="true" tabindex="-1"></a>model <span class="op">=</span> RIUNet()</span>
+<span id="cb25-3"><a href="#cb25-3" aria-hidden="true" tabindex="-1"></a>logits <span class="op">=</span> model(inp)</span>
+<span id="cb25-4"><a href="#cb25-4" aria-hidden="true" tabindex="-1"></a><span class="cf">assert</span> logits.shape <span class="op">==</span> (bs, n_classes, h, w)</span>
+<span id="cb25-5"><a href="#cb25-5" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(logits.shape, <span class="ss">f'== (</span><span class="sc">{</span>bs<span class="sc">}</span><span class="ss">, </span><span class="sc">{</span>n_classes<span class="sc">}</span><span class="ss">, </span><span class="sc">{</span>h<span class="sc">}</span><span class="ss">, </span><span class="sc">{</span>w<span class="sc">}</span><span class="ss">)'</span>)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output cell-output-stdout">
+<pre><code>torch.Size([1, 20, 64, 512]) == (1, 20, 64, 512)</code></pre>
+</div>
+</div>
+<p>It initializes the weights from the classification head from a normal distribution with a standard deviation of 1e-2. The motivation is to reduce any random bias on the outputs of the untrained model.</p>
+<div id="f72d817a-c277-4fe1-ab28-02335fa2b6d4" class="cell">
+<div class="sourceCode cell-code" id="cb27"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb27-1"><a href="#cb27-1" aria-hidden="true" tabindex="-1"></a>plot_param_dists(model, <span class="st">'head</span><span class="er">\</span><span class="st">.weight'</span>, <span class="fl">0.0064</span>)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output cell-output-display">
+<div>
+<figure class="figure">
+<p><img src="01_biasutti2019riu_files/figure-html/cell-23-output-1.png" class="img-fluid figure-img"></p>
+</figure>
+</div>
+</div>
+</div>
+<div id="c51fc0ec-6479-4793-83d9-e501c4d7e9b8" class="cell">
+<div class="sourceCode cell-code" id="cb28"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb28-1"><a href="#cb28-1" aria-hidden="true" tabindex="-1"></a><span class="cf">for</span> n, p <span class="kw">in</span> model.named_parameters():</span>
+<span id="cb28-2"><a href="#cb28-2" aria-hidden="true" tabindex="-1"></a>    <span class="cf">if</span> re.search(<span class="st">'head</span><span class="er">\</span><span class="st">.weight'</span>, n):</span>
+<span id="cb28-3"><a href="#cb28-3" aria-hidden="true" tabindex="-1"></a>        fan_in <span class="op">=</span> p.shape[<span class="dv">1</span>]<span class="op">*</span>p.shape[<span class="dv">2</span>]<span class="op">*</span>p.shape[<span class="dv">3</span>]</span>
+<span id="cb28-4"><a href="#cb28-4" aria-hidden="true" tabindex="-1"></a>        mu, sigma <span class="op">=</span> <span class="fl">0.</span>, <span class="fl">1e-2</span></span>
+<span id="cb28-5"><a href="#cb28-5" aria-hidden="true" tabindex="-1"></a>        p_data <span class="op">=</span> p.view(<span class="op">-</span><span class="dv">1</span>).data</span>
+<span id="cb28-6"><a href="#cb28-6" aria-hidden="true" tabindex="-1"></a>        <span class="cf">assert</span> <span class="bu">abs</span>(mu <span class="op">-</span> p_data.mean()) <span class="op">&lt;</span> <span class="fl">1e-2</span></span>
+<span id="cb28-7"><a href="#cb28-7" aria-hidden="true" tabindex="-1"></a>        <span class="cf">assert</span> <span class="bu">abs</span>(sigma <span class="op">-</span> p_data.std()) <span class="op">&lt;</span> <span class="fl">1e-2</span></span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+</div>
+</section>
+</section>
+<section id="loss-function" class="level2">
+<h2 class="anchored" data-anchor-id="loss-function">Loss function</h2>
+<p>The proposed equation for the loss function is the following.</p>
+<p><span class="math display">\[
+E = -\sum_{x \in \Omega}{w(x)\log(p_{l(x)}(x))\mathbf{1}_{\{m(x)&gt;0\}}}
+\]</span></p>
+<p>The factor <span class="math inline">\(w\)</span> is motivated as a way “to give <strong>more importance to pixels that are close to a separation between two labels</strong>”. It was first defined in <a href="https://arxiv.org/abs/1505.04597">U-Net</a> as follows.</p>
+<p><span class="math display">\[
+w(x) = w_c + w_{0}\exp\left ( -\frac{(d_{1}(x) + d_{2}(x))^{2}}{2\sigma^{2}} \right )
+\]</span></p>
+<p>From <a href="https://arxiv.org/abs/1505.04597">U-Net</a>:</p>
+<blockquote class="blockquote">
+<p>“where <span class="math inline">\(w_{c}\)</span> […] is the weight map to balance the class frequencies, <span class="math inline">\(d_{1}\)</span> […] denotes the distance to the border of the nearest cell and <span class="math inline">\(d_{2}\)</span> […] the distance to the border of the second nearest cell.</p>
+</blockquote>
+<p>While this particular equation for <span class="math inline">\(w\)</span> can be seen as very specific for the original biomedical application in the Unet paper, its motivation is generally valid for any image semantic segmentation task such as ours. Hence, we can rewrite the equation for <span class="math inline">\(w\)</span> as follows.</p>
+<p><span class="math display">\[
+w(x) = w_{c} + \lambda w_{b}
+\]</span></p>
+<p>Similarly to the previous equation, <span class="math inline">\(w_{c}\)</span> accounts for class imbalance, but the second term is rewritten as a general <span class="math inline">\(w_{b}\)</span> factor that should account for the boundaries of the semantic maps.</p>
+<p>For now, we only implemented the <span class="math inline">\(w_{c}\)</span> factor. <strong>We leave the <span class="math inline">\(w_{b}\)</span> factor and the necessary experimentation to evaluate its impact in the final model as TODO items.</strong></p>
+<p>Since the weighing and masking of the cross entropy loss is already implemented through the parameters <code>weight</code> and <code>ignore_index</code> in Pytorch’s <a href="https://pytorch.org/docs/stable/generated/torch.nn.CrossEntropyLoss.html">CrossEntropyLoss</a> module, we implement our own wrapper simply for convenience.</p>
+<hr>
+<p><a href="https://github.com/AIR-UFG/colorcloud/blob/main/colorcloud/biasutti2019riu.py#L121" target="_blank" style="float:right; font-size:smaller">source</a></p>
+<section id="weightedmaskedceloss" class="level3">
+<h3 class="anchored" data-anchor-id="weightedmaskedceloss">WeightedMaskedCELoss</h3>
+<blockquote class="blockquote">
+<pre><code> WeightedMaskedCELoss (weight, device)</code></pre>
+</blockquote>
+<p><em>Convenient wrapper for the CrossEntropyLoss module with a <code>weight</code> and <code>ignore_index</code> paremeters already set.</em></p>
+<div id="cfcf9ebe-5ebb-4a7e-8915-2ba2c46522e2" class="cell">
+<details open="" class="code-fold">
+<summary>Exported source</summary>
+<div class="sourceCode cell-code" id="cb30"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb30-1"><a href="#cb30-1" aria-hidden="true" tabindex="-1"></a><span class="kw">class</span> WeightedMaskedCELoss(Module):</span>
+<span id="cb30-2"><a href="#cb30-2" aria-hidden="true" tabindex="-1"></a>    <span class="co">"Convenient wrapper for the CrossEntropyLoss module with a `weight` and `ignore_index` paremeters already set."</span></span>
+<span id="cb30-3"><a href="#cb30-3" aria-hidden="true" tabindex="-1"></a>    <span class="kw">def</span> <span class="fu">__init__</span>(<span class="va">self</span>, weight, device):</span>
+<span id="cb30-4"><a href="#cb30-4" aria-hidden="true" tabindex="-1"></a>        <span class="bu">super</span>().<span class="fu">__init__</span>()</span>
+<span id="cb30-5"><a href="#cb30-5" aria-hidden="true" tabindex="-1"></a>        <span class="va">self</span>.ignore_index <span class="op">=</span> <span class="op">-</span><span class="dv">1</span></span>
+<span id="cb30-6"><a href="#cb30-6" aria-hidden="true" tabindex="-1"></a>        <span class="va">self</span>.wmCE <span class="op">=</span> CrossEntropyLoss(weight<span class="op">=</span>torch.from_numpy(weight).to(device), ignore_index<span class="op">=</span><span class="va">self</span>.ignore_index)</span>
+<span id="cb30-7"><a href="#cb30-7" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb30-8"><a href="#cb30-8" aria-hidden="true" tabindex="-1"></a>    <span class="kw">def</span> forward(<span class="va">self</span>, pred, label, mask):</span>
+<span id="cb30-9"><a href="#cb30-9" aria-hidden="true" tabindex="-1"></a>        label <span class="op">=</span> label.clone()</span>
+<span id="cb30-10"><a href="#cb30-10" aria-hidden="true" tabindex="-1"></a>        label[<span class="op">~</span>mask] <span class="op">=</span> <span class="va">self</span>.ignore_index</span>
+<span id="cb30-11"><a href="#cb30-11" aria-hidden="true" tabindex="-1"></a>        loss <span class="op">=</span> <span class="va">self</span>.wmCE(pred, label)</span>
+<span id="cb30-12"><a href="#cb30-12" aria-hidden="true" tabindex="-1"></a>        <span class="cf">return</span> loss</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+</details>
+</div>
+</section>
+</section>
+<section id="metrics" class="level2">
+<h2 class="anchored" data-anchor-id="metrics">Metrics</h2>
+<p>The proposed metric is the Intersection over Union (a.k.a. the <a href="https://en.wikipedia.org/wiki/Jaccard_index">Jaccard Index</a>), which is implemented in the following module.</p>
+<hr>
+<p><a href="https://github.com/AIR-UFG/colorcloud/blob/main/colorcloud/biasutti2019riu.py#L135" target="_blank" style="float:right; font-size:smaller">source</a></p>
+<section id="segmentationiou" class="level3">
+<h3 class="anchored" data-anchor-id="segmentationiou">SegmentationIoU</h3>
+<blockquote class="blockquote">
+<pre><code> SegmentationIoU (num_classes, reduction='mean')</code></pre>
+</blockquote>
+<p>*Base class for all neural network modules.</p>
+<p>Your models should also subclass this class.</p>
+<p>Modules can also contain other Modules, allowing them to be nested in a tree structure. You can assign the submodules as regular attributes::</p>
+<pre><code>import torch.nn as nn
+import torch.nn.functional as F
+
+class Model(nn.Module):
+    def __init__(self) -&gt; None:
+        super().__init__()
+        self.conv1 = nn.Conv2d(1, 20, 5)
+        self.conv2 = nn.Conv2d(20, 20, 5)
+
+    def forward(self, x):
+        x = F.relu(self.conv1(x))
+        return F.relu(self.conv2(x))</code></pre>
+<p>Submodules assigned in this way will be registered, and will also have their parameters converted when you call :meth:<code>to</code>, etc.</p>
+<p>.. note:: As per the example above, an <code>__init__()</code> call to the parent class must be made before assignment on the child.</p>
+<p>:ivar training: Boolean represents whether this module is in training or evaluation mode. :vartype training: bool*</p>
+<div id="aa87fa91-f53a-4e61-bef6-721c26b42f9e" class="cell">
+<details open="" class="code-fold">
+<summary>Exported source</summary>
+<div class="sourceCode cell-code" id="cb33"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb33-1"><a href="#cb33-1" aria-hidden="true" tabindex="-1"></a><span class="kw">class</span> SegmentationIoU(Module):</span>
+<span id="cb33-2"><a href="#cb33-2" aria-hidden="true" tabindex="-1"></a>    <span class="kw">def</span> <span class="fu">__init__</span>(<span class="va">self</span>, num_classes, reduction<span class="op">=</span><span class="st">'mean'</span>):</span>
+<span id="cb33-3"><a href="#cb33-3" aria-hidden="true" tabindex="-1"></a>        <span class="cf">assert</span> reduction <span class="kw">in</span> [<span class="st">'mean'</span>, <span class="st">'none'</span>]</span>
+<span id="cb33-4"><a href="#cb33-4" aria-hidden="true" tabindex="-1"></a>        <span class="bu">super</span>().<span class="fu">__init__</span>()</span>
+<span id="cb33-5"><a href="#cb33-5" aria-hidden="true" tabindex="-1"></a>        <span class="va">self</span>.num_classes <span class="op">=</span> num_classes</span>
+<span id="cb33-6"><a href="#cb33-6" aria-hidden="true" tabindex="-1"></a>        <span class="va">self</span>.reduction <span class="op">=</span> reduction</span>
+<span id="cb33-7"><a href="#cb33-7" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb33-8"><a href="#cb33-8" aria-hidden="true" tabindex="-1"></a>    <span class="kw">def</span> forward(<span class="va">self</span>, pred, label, mask):</span>
+<span id="cb33-9"><a href="#cb33-9" aria-hidden="true" tabindex="-1"></a>        label <span class="op">=</span> label.clone()</span>
+<span id="cb33-10"><a href="#cb33-10" aria-hidden="true" tabindex="-1"></a>        pred[<span class="op">~</span>mask] <span class="op">*=</span> <span class="dv">0</span></span>
+<span id="cb33-11"><a href="#cb33-11" aria-hidden="true" tabindex="-1"></a>        label[<span class="op">~</span>mask] <span class="op">*=</span> <span class="dv">0</span></span>
+<span id="cb33-12"><a href="#cb33-12" aria-hidden="true" tabindex="-1"></a>        oh_pred <span class="op">=</span> F.one_hot(pred, num_classes<span class="op">=</span><span class="va">self</span>.num_classes)</span>
+<span id="cb33-13"><a href="#cb33-13" aria-hidden="true" tabindex="-1"></a>        oh_label <span class="op">=</span> F.one_hot(label, num_classes<span class="op">=</span><span class="va">self</span>.num_classes)</span>
+<span id="cb33-14"><a href="#cb33-14" aria-hidden="true" tabindex="-1"></a>        intersect <span class="op">=</span> (oh_pred<span class="op">*</span>oh_label).<span class="bu">sum</span>(dim<span class="op">=</span>(<span class="dv">1</span>, <span class="dv">2</span>))</span>
+<span id="cb33-15"><a href="#cb33-15" aria-hidden="true" tabindex="-1"></a>        union <span class="op">=</span> ((oh_pred <span class="op">+</span> oh_label).clamp(<span class="bu">max</span><span class="op">=</span><span class="dv">1</span>)).<span class="bu">sum</span>(dim<span class="op">=</span>(<span class="dv">1</span>,<span class="dv">2</span>))</span>
+<span id="cb33-16"><a href="#cb33-16" aria-hidden="true" tabindex="-1"></a>        intersect[union <span class="op">==</span> <span class="dv">0</span>] <span class="op">=</span> <span class="dv">1</span></span>
+<span id="cb33-17"><a href="#cb33-17" aria-hidden="true" tabindex="-1"></a>        union[union <span class="op">==</span> <span class="dv">0</span>] <span class="op">=</span> <span class="dv">1</span></span>
+<span id="cb33-18"><a href="#cb33-18" aria-hidden="true" tabindex="-1"></a>        iou <span class="op">=</span> (intersect<span class="op">/</span>union)</span>
+<span id="cb33-19"><a href="#cb33-19" aria-hidden="true" tabindex="-1"></a>        <span class="cf">if</span> <span class="va">self</span>.reduction <span class="op">==</span> <span class="st">'mean'</span>:</span>
+<span id="cb33-20"><a href="#cb33-20" aria-hidden="true" tabindex="-1"></a>            iou <span class="op">=</span> iou[:,<span class="dv">1</span>:].mean()</span>
+<span id="cb33-21"><a href="#cb33-21" aria-hidden="true" tabindex="-1"></a>        <span class="cf">return</span> iou</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+</details>
+</div>
+</section>
+</section>
+<section id="semantickitti-experiments" class="level2">
+<h2 class="anchored" data-anchor-id="semantickitti-experiments">SemanticKITTI Experiments</h2>
+<p>As mentioned in the summarizing quotes in the first section, the original experiments used “range-images with segmentation labels exported from the 3D object detection challenge of the KITTI dataset”. Improving on that, we implement our experiments using the <a href="https://arxiv.org/pdf/1904.01416">SemanticKITTI: A Dataset for Semantic Scene Understanding of LiDAR Sequences</a>, which was published around the same time as the RIU-Net paper and introduced a much bigger and better dataset for the task of pointcloud semantic segmentation.</p>
+<p>Based on what was summarized from the Methodology and Experiments sections and our adaptations described in this notebook, here are the specifications of the <strong>Data</strong>, <strong>Model</strong>, <strong>Loss</strong>, <strong>Optimizer</strong> and <strong>Metric</strong> used in our experiments:</p>
+<ul>
+<li><strong>Data</strong>:
+<ol type="1">
+<li>Applied spherical projection to 512 x 64 pixels</li>
+<li>5 channels: x, y, z, reflectance, depth</li>
+</ol></li>
+</ul>
+<div id="6787256b-67b2-4e21-b249-c33353ee9c41" class="cell">
+<div class="sourceCode cell-code" id="cb34"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb34-1"><a href="#cb34-1" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> colorcloud.behley2019iccv <span class="im">import</span> get_benchmarking_dls</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+</div>
+<div id="b002aea0-254c-473f-aa42-d72d8afd07ad" class="cell">
+<div class="sourceCode cell-code" id="cb35"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb35-1"><a href="#cb35-1" aria-hidden="true" tabindex="-1"></a>dls <span class="op">=</span> get_benchmarking_dls(</span>
+<span id="cb35-2"><a href="#cb35-2" aria-hidden="true" tabindex="-1"></a>    data_path<span class="op">=</span><span class="st">'/workspace/data'</span>,</span>
+<span id="cb35-3"><a href="#cb35-3" aria-hidden="true" tabindex="-1"></a>    proj_style<span class="op">=</span><span class="st">'spherical'</span>,</span>
+<span id="cb35-4"><a href="#cb35-4" aria-hidden="true" tabindex="-1"></a>    proj_kargs<span class="op">=</span>{</span>
+<span id="cb35-5"><a href="#cb35-5" aria-hidden="true" tabindex="-1"></a>        <span class="st">'fov_up_deg'</span>: <span class="fl">3.</span>, </span>
+<span id="cb35-6"><a href="#cb35-6" aria-hidden="true" tabindex="-1"></a>        <span class="st">'fov_down_deg'</span>: <span class="op">-</span><span class="fl">25.</span>, </span>
+<span id="cb35-7"><a href="#cb35-7" aria-hidden="true" tabindex="-1"></a>        <span class="st">'W'</span>: <span class="dv">512</span>, <span class="st">'H'</span>: <span class="dv">64</span></span>
+<span id="cb35-8"><a href="#cb35-8" aria-hidden="true" tabindex="-1"></a>    }</span>
+<span id="cb35-9"><a href="#cb35-9" aria-hidden="true" tabindex="-1"></a>)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+</div>
+<ul>
+<li><strong>Model</strong>:
+<ol type="1">
+<li><code>RIUNet</code> module with its default hyperparameters</li>
+</ol></li>
+</ul>
+<div id="c4893e95-258a-4b7d-b872-ad3731daf82b" class="cell">
+<div class="sourceCode cell-code" id="cb36"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb36-1"><a href="#cb36-1" aria-hidden="true" tabindex="-1"></a>device <span class="op">=</span> (</span>
+<span id="cb36-2"><a href="#cb36-2" aria-hidden="true" tabindex="-1"></a>    <span class="st">"cuda"</span></span>
+<span id="cb36-3"><a href="#cb36-3" aria-hidden="true" tabindex="-1"></a>    <span class="cf">if</span> torch.cuda.is_available()</span>
+<span id="cb36-4"><a href="#cb36-4" aria-hidden="true" tabindex="-1"></a>    <span class="cf">else</span> <span class="st">"mps"</span></span>
+<span id="cb36-5"><a href="#cb36-5" aria-hidden="true" tabindex="-1"></a>    <span class="cf">if</span> torch.backends.mps.is_available()</span>
+<span id="cb36-6"><a href="#cb36-6" aria-hidden="true" tabindex="-1"></a>    <span class="cf">else</span> <span class="st">"cpu"</span></span>
+<span id="cb36-7"><a href="#cb36-7" aria-hidden="true" tabindex="-1"></a>)</span>
+<span id="cb36-8"><a href="#cb36-8" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="ss">f"Using </span><span class="sc">{</span>device<span class="sc">}</span><span class="ss"> device"</span>)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+</div>
+<div id="90051e5a-4f68-4df7-a1a7-780a978b3778" class="cell">
+<div class="sourceCode cell-code" id="cb37"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb37-1"><a href="#cb37-1" aria-hidden="true" tabindex="-1"></a>model <span class="op">=</span> RIUNet().to(device)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+</div>
+<ul>
+<li><strong>Loss</strong>:
+<ol type="1">
+<li><code>WeightedMaskedCELoss</code> module</li>
+</ol></li>
+</ul>
+<div id="80182b67-8206-46b7-a89e-704687aa92a1" class="cell">
+<div class="sourceCode cell-code" id="cb38"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb38-1"><a href="#cb38-1" aria-hidden="true" tabindex="-1"></a>loss_fn <span class="op">=</span> WeightedMaskedCELoss(dls[<span class="dv">0</span>].dataset.content_weights, device)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+</div>
+<ul>
+<li><strong>Optimizer</strong>:
+<ol type="1">
+<li><code>AdamW</code> with the <code>OneCycleLR</code> lr scheduler</li>
+</ol></li>
+</ul>
+<div id="1c37ef7a-fd5f-4515-acd2-573ec3e74bba" class="cell">
+<div class="sourceCode cell-code" id="cb39"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb39-1"><a href="#cb39-1" aria-hidden="true" tabindex="-1"></a>lr <span class="op">=</span> <span class="fl">1e-4</span></span>
+<span id="cb39-2"><a href="#cb39-2" aria-hidden="true" tabindex="-1"></a>n_epochs <span class="op">=</span> <span class="dv">30</span></span>
+<span id="cb39-3"><a href="#cb39-3" aria-hidden="true" tabindex="-1"></a>total_steps <span class="op">=</span> n_epochs<span class="op">*</span><span class="bu">len</span>(dls[<span class="dv">0</span>])</span>
+<span id="cb39-4"><a href="#cb39-4" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb39-5"><a href="#cb39-5" aria-hidden="true" tabindex="-1"></a>optimizer <span class="op">=</span> AdamW(model.parameters(), lr)</span>
+<span id="cb39-6"><a href="#cb39-6" aria-hidden="true" tabindex="-1"></a>lr_scheduler <span class="op">=</span> OneCycleLR(optimizer, lr, total_steps)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+</div>
+<ul>
+<li><strong>Metric</strong>:
+<ol type="1">
+<li><code>SegmentationIoU</code> module</li>
+</ol></li>
+</ul>
+<div id="6a5d032d-a738-4e8c-9801-42469e768faa" class="cell">
+<div class="sourceCode cell-code" id="cb40"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb40-1"><a href="#cb40-1" aria-hidden="true" tabindex="-1"></a>metric_fn <span class="op">=</span> SegmentationIoU(dls[<span class="dv">0</span>].dataset.learning_map_np.<span class="bu">max</span>() <span class="op">+</span> <span class="dv">1</span>)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+</div>
+<p>TODO: needs proper documentation with code examples for the experiments.</p>
+
+
+</section>
+
+</main> <!-- /main -->
+<script id="quarto-html-after-body" type="application/javascript">
+  window.document.addEventListener("DOMContentLoaded", function (event) {
+    const icon = "";
+    const anchorJS = new window.AnchorJS();
+    anchorJS.options = {
+      placement: 'right',
+      icon: icon
+    };
+    anchorJS.add('.anchored');
+    const isCodeAnnotation = (el) => {
+      for (const clz of el.classList) {
+        if (clz.startsWith('code-annotation-')) {                     
+          return true;
+        }
+      }
+      return false;
+    }
+    const onCopySuccess = function(e) {
+      // button target
+      const button = e.trigger;
+      // don't keep focus
+      button.blur();
+      // flash "checked"
+      button.classList.add('code-copy-button-checked');
+      var currentTitle = button.getAttribute("title");
+      button.setAttribute("title", "Copied!");
+      let tooltip;
+      if (window.bootstrap) {
+        button.setAttribute("data-bs-toggle", "tooltip");
+        button.setAttribute("data-bs-placement", "left");
+        button.setAttribute("data-bs-title", "Copied!");
+        tooltip = new bootstrap.Tooltip(button, 
+          { trigger: "manual", 
+            customClass: "code-copy-button-tooltip",
+            offset: [0, -8]});
+        tooltip.show();    
+      }
+      setTimeout(function() {
+        if (tooltip) {
+          tooltip.hide();
+          button.removeAttribute("data-bs-title");
+          button.removeAttribute("data-bs-toggle");
+          button.removeAttribute("data-bs-placement");
+        }
+        button.setAttribute("title", currentTitle);
+        button.classList.remove('code-copy-button-checked');
+      }, 1000);
+      // clear code selection
+      e.clearSelection();
+    }
+    const getTextToCopy = function(trigger) {
+        const codeEl = trigger.previousElementSibling.cloneNode(true);
+        for (const childEl of codeEl.children) {
+          if (isCodeAnnotation(childEl)) {
+            childEl.remove();
+          }
+        }
+        return codeEl.innerText;
+    }
+    const clipboard = new window.ClipboardJS('.code-copy-button:not([data-in-quarto-modal])', {
+      text: getTextToCopy
+    });
+    clipboard.on('success', onCopySuccess);
+    if (window.document.getElementById('quarto-embedded-source-code-modal')) {
+      const clipboardModal = new window.ClipboardJS('.code-copy-button[data-in-quarto-modal]', {
+        text: getTextToCopy,
+        container: window.document.getElementById('quarto-embedded-source-code-modal')
+      });
+      clipboardModal.on('success', onCopySuccess);
+    }
+      var localhostRegex = new RegExp(/^(?:http|https):\/\/localhost\:?[0-9]*\//);
+      var mailtoRegex = new RegExp(/^mailto:/);
+        var filterRegex = new RegExp("https:\/\/AIR-UFG\.github\.io\/colorcloud");
+      var isInternal = (href) => {
+          return filterRegex.test(href) || localhostRegex.test(href) || mailtoRegex.test(href);
+      }
+      // Inspect non-navigation links and adorn them if external
+     var links = window.document.querySelectorAll('a[href]:not(.nav-link):not(.navbar-brand):not(.toc-action):not(.sidebar-link):not(.sidebar-item-toggle):not(.pagination-link):not(.no-external):not([aria-hidden]):not(.dropdown-item):not(.quarto-navigation-tool):not(.about-link)');
+      for (var i=0; i<links.length; i++) {
+        const link = links[i];
+        if (!isInternal(link.href)) {
+          // undo the damage that might have been done by quarto-nav.js in the case of
+          // links that we want to consider external
+          if (link.dataset.originalHref !== undefined) {
+            link.href = link.dataset.originalHref;
+          }
+        }
+      }
+    function tippyHover(el, contentFn, onTriggerFn, onUntriggerFn) {
+      const config = {
+        allowHTML: true,
+        maxWidth: 500,
+        delay: 100,
+        arrow: false,
+        appendTo: function(el) {
+            return el.parentElement;
+        },
+        interactive: true,
+        interactiveBorder: 10,
+        theme: 'quarto',
+        placement: 'bottom-start',
+      };
+      if (contentFn) {
+        config.content = contentFn;
+      }
+      if (onTriggerFn) {
+        config.onTrigger = onTriggerFn;
+      }
+      if (onUntriggerFn) {
+        config.onUntrigger = onUntriggerFn;
+      }
+      window.tippy(el, config); 
+    }
+    const noterefs = window.document.querySelectorAll('a[role="doc-noteref"]');
+    for (var i=0; i<noterefs.length; i++) {
+      const ref = noterefs[i];
+      tippyHover(ref, function() {
+        // use id or data attribute instead here
+        let href = ref.getAttribute('data-footnote-href') || ref.getAttribute('href');
+        try { href = new URL(href).hash; } catch {}
+        const id = href.replace(/^#\/?/, "");
+        const note = window.document.getElementById(id);
+        if (note) {
+          return note.innerHTML;
+        } else {
+          return "";
+        }
+      });
+    }
+    const xrefs = window.document.querySelectorAll('a.quarto-xref');
+    const processXRef = (id, note) => {
+      // Strip column container classes
+      const stripColumnClz = (el) => {
+        el.classList.remove("page-full", "page-columns");
+        if (el.children) {
+          for (const child of el.children) {
+            stripColumnClz(child);
+          }
+        }
+      }
+      stripColumnClz(note)
+      if (id === null || id.startsWith('sec-')) {
+        // Special case sections, only their first couple elements
+        const container = document.createElement("div");
+        if (note.children && note.children.length > 2) {
+          container.appendChild(note.children[0].cloneNode(true));
+          for (let i = 1; i < note.children.length; i++) {
+            const child = note.children[i];
+            if (child.tagName === "P" && child.innerText === "") {
+              continue;
+            } else {
+              container.appendChild(child.cloneNode(true));
+              break;
+            }
+          }
+          if (window.Quarto?.typesetMath) {
+            window.Quarto.typesetMath(container);
+          }
+          return container.innerHTML
+        } else {
+          if (window.Quarto?.typesetMath) {
+            window.Quarto.typesetMath(note);
+          }
+          return note.innerHTML;
+        }
+      } else {
+        // Remove any anchor links if they are present
+        const anchorLink = note.querySelector('a.anchorjs-link');
+        if (anchorLink) {
+          anchorLink.remove();
+        }
+        if (window.Quarto?.typesetMath) {
+          window.Quarto.typesetMath(note);
+        }
+        if (note.classList.contains("callout")) {
+          return note.outerHTML;
+        } else {
+          return note.innerHTML;
+        }
+      }
+    }
+    for (var i=0; i<xrefs.length; i++) {
+      const xref = xrefs[i];
+      tippyHover(xref, undefined, function(instance) {
+        instance.disable();
+        let url = xref.getAttribute('href');
+        let hash = undefined; 
+        if (url.startsWith('#')) {
+          hash = url;
+        } else {
+          try { hash = new URL(url).hash; } catch {}
+        }
+        if (hash) {
+          const id = hash.replace(/^#\/?/, "");
+          const note = window.document.getElementById(id);
+          if (note !== null) {
+            try {
+              const html = processXRef(id, note.cloneNode(true));
+              instance.setContent(html);
+            } finally {
+              instance.enable();
+              instance.show();
+            }
+          } else {
+            // See if we can fetch this
+            fetch(url.split('#')[0])
+            .then(res => res.text())
+            .then(html => {
+              const parser = new DOMParser();
+              const htmlDoc = parser.parseFromString(html, "text/html");
+              const note = htmlDoc.getElementById(id);
+              if (note !== null) {
+                const html = processXRef(id, note);
+                instance.setContent(html);
+              } 
+            }).finally(() => {
+              instance.enable();
+              instance.show();
+            });
+          }
+        } else {
+          // See if we can fetch a full url (with no hash to target)
+          // This is a special case and we should probably do some content thinning / targeting
+          fetch(url)
+          .then(res => res.text())
+          .then(html => {
+            const parser = new DOMParser();
+            const htmlDoc = parser.parseFromString(html, "text/html");
+            const note = htmlDoc.querySelector('main.content');
+            if (note !== null) {
+              // This should only happen for chapter cross references
+              // (since there is no id in the URL)
+              // remove the first header
+              if (note.children.length > 0 && note.children[0].tagName === "HEADER") {
+                note.children[0].remove();
+              }
+              const html = processXRef(null, note);
+              instance.setContent(html);
+            } 
+          }).finally(() => {
+            instance.enable();
+            instance.show();
+          });
+        }
+      }, function(instance) {
+      });
+    }
+        let selectedAnnoteEl;
+        const selectorForAnnotation = ( cell, annotation) => {
+          let cellAttr = 'data-code-cell="' + cell + '"';
+          let lineAttr = 'data-code-annotation="' +  annotation + '"';
+          const selector = 'span[' + cellAttr + '][' + lineAttr + ']';
+          return selector;
+        }
+        const selectCodeLines = (annoteEl) => {
+          const doc = window.document;
+          const targetCell = annoteEl.getAttribute("data-target-cell");
+          const targetAnnotation = annoteEl.getAttribute("data-target-annotation");
+          const annoteSpan = window.document.querySelector(selectorForAnnotation(targetCell, targetAnnotation));
+          const lines = annoteSpan.getAttribute("data-code-lines").split(",");
+          const lineIds = lines.map((line) => {
+            return targetCell + "-" + line;
+          })
+          let top = null;
+          let height = null;
+          let parent = null;
+          if (lineIds.length > 0) {
+              //compute the position of the single el (top and bottom and make a div)
+              const el = window.document.getElementById(lineIds[0]);
+              top = el.offsetTop;
+              height = el.offsetHeight;
+              parent = el.parentElement.parentElement;
+            if (lineIds.length > 1) {
+              const lastEl = window.document.getElementById(lineIds[lineIds.length - 1]);
+              const bottom = lastEl.offsetTop + lastEl.offsetHeight;
+              height = bottom - top;
+            }
+            if (top !== null && height !== null && parent !== null) {
+              // cook up a div (if necessary) and position it 
+              let div = window.document.getElementById("code-annotation-line-highlight");
+              if (div === null) {
+                div = window.document.createElement("div");
+                div.setAttribute("id", "code-annotation-line-highlight");
+                div.style.position = 'absolute';
+                parent.appendChild(div);
+              }
+              div.style.top = top - 2 + "px";
+              div.style.height = height + 4 + "px";
+              div.style.left = 0;
+              let gutterDiv = window.document.getElementById("code-annotation-line-highlight-gutter");
+              if (gutterDiv === null) {
+                gutterDiv = window.document.createElement("div");
+                gutterDiv.setAttribute("id", "code-annotation-line-highlight-gutter");
+                gutterDiv.style.position = 'absolute';
+                const codeCell = window.document.getElementById(targetCell);
+                const gutter = codeCell.querySelector('.code-annotation-gutter');
+                gutter.appendChild(gutterDiv);
+              }
+              gutterDiv.style.top = top - 2 + "px";
+              gutterDiv.style.height = height + 4 + "px";
+            }
+            selectedAnnoteEl = annoteEl;
+          }
+        };
+        const unselectCodeLines = () => {
+          const elementsIds = ["code-annotation-line-highlight", "code-annotation-line-highlight-gutter"];
+          elementsIds.forEach((elId) => {
+            const div = window.document.getElementById(elId);
+            if (div) {
+              div.remove();
+            }
+          });
+          selectedAnnoteEl = undefined;
+        };
+          // Handle positioning of the toggle
+      window.addEventListener(
+        "resize",
+        throttle(() => {
+          elRect = undefined;
+          if (selectedAnnoteEl) {
+            selectCodeLines(selectedAnnoteEl);
+          }
+        }, 10)
+      );
+      function throttle(fn, ms) {
+      let throttle = false;
+      let timer;
+        return (...args) => {
+          if(!throttle) { // first call gets through
+              fn.apply(this, args);
+              throttle = true;
+          } else { // all the others get throttled
+              if(timer) clearTimeout(timer); // cancel #2
+              timer = setTimeout(() => {
+                fn.apply(this, args);
+                timer = throttle = false;
+              }, ms);
+          }
+        };
+      }
+        // Attach click handler to the DT
+        const annoteDls = window.document.querySelectorAll('dt[data-target-cell]');
+        for (const annoteDlNode of annoteDls) {
+          annoteDlNode.addEventListener('click', (event) => {
+            const clickedEl = event.target;
+            if (clickedEl !== selectedAnnoteEl) {
+              unselectCodeLines();
+              const activeEl = window.document.querySelector('dt[data-target-cell].code-annotation-active');
+              if (activeEl) {
+                activeEl.classList.remove('code-annotation-active');
+              }
+              selectCodeLines(clickedEl);
+              clickedEl.classList.add('code-annotation-active');
+            } else {
+              // Unselect the line
+              unselectCodeLines();
+              clickedEl.classList.remove('code-annotation-active');
+            }
+          });
+        }
+    const findCites = (el) => {
+      const parentEl = el.parentElement;
+      if (parentEl) {
+        const cites = parentEl.dataset.cites;
+        if (cites) {
+          return {
+            el,
+            cites: cites.split(' ')
+          };
+        } else {
+          return findCites(el.parentElement)
+        }
+      } else {
+        return undefined;
+      }
+    };
+    var bibliorefs = window.document.querySelectorAll('a[role="doc-biblioref"]');
+    for (var i=0; i<bibliorefs.length; i++) {
+      const ref = bibliorefs[i];
+      const citeInfo = findCites(ref);
+      if (citeInfo) {
+        tippyHover(citeInfo.el, function() {
+          var popup = window.document.createElement('div');
+          citeInfo.cites.forEach(function(cite) {
+            var citeDiv = window.document.createElement('div');
+            citeDiv.classList.add('hanging-indent');
+            citeDiv.classList.add('csl-entry');
+            var biblioDiv = window.document.getElementById('ref-' + cite);
+            if (biblioDiv) {
+              citeDiv.innerHTML = biblioDiv.innerHTML;
+            }
+            popup.appendChild(citeDiv);
+          });
+          return popup.innerHTML;
+        });
+      }
+    }
+  });
+  </script>
+</div> <!-- /content -->
+
+
+
+
+<footer class="footer"><div class="nav-footer"><div class="nav-footer-center"><div class="toc-actions d-sm-block d-md-none"><ul><li><a href="https://github.com/AIR-UFG/colorcloud/issues/new" class="toc-action"><i class="bi bi-github"></i>Report an issue</a></li></ul></div></div></div></footer></body></html>
