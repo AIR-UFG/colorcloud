@@ -167,33 +167,55 @@ class UnfoldingProjection:
     def __init__(self, W, H):
         self.W = W
         self.H = H
-    
-    def get_xy_projections(self, scan_xyz, depth):
+
+    def get_xy_projections(self, scan_xyz, depth, ring=None):
         # get yaw angles of all points
         yaw = np.arctan2(scan_xyz[:,1], scan_xyz[:,0])
         
-        # rectify yaw value to be between ]0, 2*pi[
-        yaw[yaw < 0] += 2.*np.pi
+        # rectify yaw value to be between ]0, 2*pi] (arctan2 is (-pi, pi])
+        yaw[yaw < 0] += 2.*np.pi 
         
-        # scale to image size
-        proj_x  = np.floor(self.W*0.5*yaw/np.pi).astype(np.int32)
-        
-        # just making sure nothing wierd happened with the np.arctan2 or the np.floor functions
-        assert proj_x.min() >= 0
-        assert proj_x.max() < self.W
-        
-        # find discontinuities ("jumps") from scan completing cycle
-        jump = yaw[1:] - yaw[:-1] < -np.pi
-        jump = np.concatenate((np.zeros(1), jump))
-        
-        # every jump indicates a new scan row
-        proj_y = jump.cumsum().astype(np.int32)
-        
-        # for debugging only
-        if proj_y.max() > self.H - 1:
-            print(proj_y.max())
-        assert proj_y.max() <= self.H - 1
-        
+
+        if ring is not None:
+            # scale to image size for x-coordinate
+            # yaw is in (0, 2*pi], yaw/(2*pi) is in (0, 1]
+            # W * yaw/(2*pi) is in (0, W]
+            # floor makes it [0, W]. Max can be W, needs clipping to W-1.
+            proj_x  = np.floor(self.W * yaw / (2. * np.pi)).astype(np.int32)
+
+            raw_proj_y = None # This will store the y-projection before potential inversion
+
+            # Use provided ring indices for y-coordinate
+            raw_proj_y = ring.astype(np.int32)
+
+            # Invert proj_y to flip the image vertically
+            proj_y = self.H - 1 - raw_proj_y
+
+            # Clip coordinates to be within image dimensions
+            proj_x  = np.clip(proj_x, 0, self.W - 1)
+            proj_y  = np.clip(proj_y, 0, self.H - 1)
+
+        else: # Fallback to yaw-based jump detection if ring are not provided
+
+            # scale to image size
+            proj_x  = np.floor(self.W*0.5*yaw/np.pi).astype(np.int32)
+
+            # just making sure nothing wierd happened with the np.arctan2 or the np.floor functions
+            assert proj_x.min() >= 0
+            assert proj_x.max() < self.W
+
+            # find discontinuities ("jumps") from scan completing cycle
+            jump = yaw[1:] - yaw[:-1] < -np.pi
+            jump = np.concatenate((np.zeros(1), jump))
+
+            # every jump indicates a new scan row
+            proj_y = jump.cumsum().astype(np.int32)
+
+            # for debugging only
+            if proj_y.max() > self.H - 1:
+                print(proj_y.max())
+            assert proj_y.max() <= self.H - 1
+
         return proj_x, proj_y, None
 
 # %% ../nbs/00_behley2019iccv.ipynb 20
@@ -204,6 +226,13 @@ class ProjectionTransform(nn.Module):
         self.projection = projection
         self.W = projection.W
         self.H = projection.H
+
+        # set projection type
+        self.projection_type = None
+        if isinstance(projection, SphericalProjection):
+            self.projection_type = 'spherical'
+        elif isinstance(projection, UnfoldingProjection):
+            self.projection_type = 'unfolding'
         
     def forward(self, item):
         frame = item['frame']
@@ -213,6 +242,10 @@ class ProjectionTransform(nn.Module):
         # get point_cloud components
         scan_xyz = frame[:,:3]
         reflectance = frame[:, 3]
+        if frame.shape[1] > 4:
+            ring = frame[:, 4]
+        else:
+            ring = None
 
         assert reflectance.max() <= 1.
         assert reflectance.min() >= 0.
@@ -221,7 +254,10 @@ class ProjectionTransform(nn.Module):
         depth = np.linalg.norm(scan_xyz, 2, axis=1)
 
         # get projections and outliers
-        proj_x, proj_y, outliers = self.projection.get_xy_projections(scan_xyz, depth)
+        if self.projection_type == 'spherical':
+            proj_x, proj_y, outliers = self.projection.get_xy_projections(scan_xyz, depth)
+        elif self.projection_type == 'unfolding':
+            proj_x, proj_y, outliers = self.projection.get_xy_projections(scan_xyz, depth, ring)
 
         # filter outliers
         if outliers is not None:
