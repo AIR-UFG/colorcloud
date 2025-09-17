@@ -4,7 +4,7 @@
 
 # %% auto 0
 __all__ = ['SemanticKITTIDataset', 'SphericalProjection', 'UnfoldingProjection', 'ProjectionTransform', 'ProjectionVizTransform',
-           'plot_projections', 'ProjectionToTensorTransform', 'get_benchmarking_dls']
+           'ProjectionToTensorTransform', 'SemanticSegmentationLDM']
 
 # %% ../nbs/00_behley2019iccv.ipynb 2
 import torch
@@ -13,30 +13,30 @@ from torch import nn
 import yaml
 from pathlib import Path
 import numpy as np
+from lightning import LightningDataModule
 from torchvision.transforms import v2
-from matplotlib import pyplot as plt
 
 # %% ../nbs/00_behley2019iccv.ipynb 4
 class SemanticKITTIDataset(Dataset):
     "Load the SemanticKITTI data in a pytorch Dataset object."
-    def __init__(self, data_path, split='train', transform=None, remapping_rules=None):
+    def __init__(self, data_path, split='train', transform=None, aircloud=False):
         data_path = Path(data_path)
         yaml_path = data_path/'semantic-kitti.yaml'
         self.velodyne_path = data_path/'data_odometry_velodyne/dataset/sequences'
         self.labels_path = data_path/'data_odometry_labels/dataset/sequences'
+        self.aircloud = aircloud
 
         with open(yaml_path, 'r') as file:
             metadata = yaml.safe_load(file)
         
-        if split != 'none':
-            sequences = metadata['split'][split]
-            velodyne_fns = []
-            for seq in sequences:
-                velodyne_fns += list(self.velodyne_path.rglob(f'*{seq:02}/velodyne/*.bin'))
-            
-            self.frame_ids = [fn.stem for fn in velodyne_fns]
-            self.frame_sequences = [fn.parts[-3] for fn in velodyne_fns]
-        self.split = split
+        sequences = metadata['split'][split]
+        velodyne_fns = []
+        for seq in sequences:
+            velodyne_fns += list(self.velodyne_path.rglob(f'*{seq:02}/velodyne/*.bin'))
+
+        velodyne_fns = sorted(velodyne_fns) 
+        self.frame_ids = [fn.stem for fn in velodyne_fns]
+        self.frame_sequences = [fn.parts[-3] for fn in velodyne_fns]
         
         self.labels_dict = metadata['labels']
         
@@ -66,9 +66,6 @@ class SemanticKITTIDataset(Dataset):
         
         self.transform = transform
         self.is_test = (split == 'test')
-
-        if remapping_rules is not None:
-            self.learning_remap(remapping_rules)
     
     def learning_remap(self, remapping_rules):
         new_map_np = np.zeros_like(self.learning_map_np, dtype=np.uint32)
@@ -94,8 +91,6 @@ class SemanticKITTIDataset(Dataset):
         return len(self.frame_ids)
 
     def __getitem__(self, idx):
-        assert self.split != 'none'
-        
         frame_id = self.frame_ids[idx]
         frame_sequence = self.frame_sequences[idx]
         
@@ -113,14 +108,23 @@ class SemanticKITTIDataset(Dataset):
             label = self.learning_map_np[label]
             mask = label != 0   # see the field *learning_ignore* in the yaml file
         
+        if self.aircloud:
+            # removing nans
+            nan_mask = ~np.isnan(frame).any(axis=1)
+            frame = frame[nan_mask]
+            label = label[nan_mask]
+            mask = mask[nan_mask]
+            # normalizing reflectance to be between 0 and 1
+            frame[:,3] = frame[:,3]/255
+        
         item = {
             'frame': frame,
             'label': label,
-            'mask': mask
+            'mask': mask,
         }
         if self.transform:
             item = self.transform(item)
-        
+            
         return item
 
 # %% ../nbs/00_behley2019iccv.ipynb 12
@@ -132,6 +136,7 @@ class SphericalProjection:
         self.fov_rad = self.fov_up_rad - self.fov_down_rad
         self.W = W
         self.H = H
+        self.inverse_projection = {}
     
     def get_xy_projections(self, scan_xyz, depth):
         # get angles of all points
@@ -158,15 +163,21 @@ class SphericalProjection:
         
         proj_y = np.floor(proj_y)
         proj_y = np.clip(proj_y, 0, self.H - 1).astype(np.int32)
+
+        # when needed to back the projection to 3d
+        self.inverse_projection["proj_x"] = proj_x
+        self.inverse_projection["proj_y"] = proj_y
+        self.inverse_projection["outlier"] = outliers
         
         return proj_x, proj_y, outliers
 
-# %% ../nbs/00_behley2019iccv.ipynb 14
+# %% ../nbs/00_behley2019iccv.ipynb 15
 class UnfoldingProjection:
     "Assume the points are sorted in increasing yaw order and line number."
     def __init__(self, W, H):
         self.W = W
         self.H = H
+        self.inverse_projection = {}
     
     def get_xy_projections(self, scan_xyz, depth):
         # get yaw angles of all points
@@ -193,10 +204,15 @@ class UnfoldingProjection:
         if proj_y.max() > self.H - 1:
             print(proj_y.max())
         assert proj_y.max() <= self.H - 1
+
+        # when needed to back the projection to 3d
+        self.inverse_projection["proj_x"] = proj_x
+        self.inverse_projection["proj_y"] = proj_y
+        self.inverse_projection["outlier"] = None
         
         return proj_x, proj_y, None
 
-# %% ../nbs/00_behley2019iccv.ipynb 20
+# %% ../nbs/00_behley2019iccv.ipynb 22
 class ProjectionTransform(nn.Module):
     "Pytorch transform that turns a point cloud frame and its respective label and mask arrays into images in given projection style."
     def __init__(self, projection):
@@ -217,6 +233,9 @@ class ProjectionTransform(nn.Module):
         assert reflectance.max() <= 1.
         assert reflectance.min() >= 0.
 
+        # keep original point indices for z-buffer mapping
+        orig_indices = np.arange(scan_xyz.shape[0], dtype=np.int32)
+        
         # get depths of all points
         depth = np.linalg.norm(scan_xyz, 2, axis=1)
 
@@ -230,6 +249,7 @@ class ProjectionTransform(nn.Module):
             scan_xyz = scan_xyz[~outliers]
             reflectance = reflectance[~outliers]
             depth = depth[~outliers]
+            orig_indices  = orig_indices[~outliers]
             if label is not None:
                 label = label[~outliers]
                 mask = mask[~outliers]
@@ -249,11 +269,17 @@ class ProjectionTransform(nn.Module):
         scan_info = scan_info[order]
         proj_y = proj_y[order]
         proj_x = proj_x[order]
+        # also reorder original indices
+        ordered_indices = orig_indices[order]
         
         # setup the image tensor
         projections_img = np.zeros((self.H, self.W, 2+len(info_list)), dtype=np.float32)
         projections_img[:,:,-1] -= 1 # this helps to identify points in the projection with no LiDAR readings
         projections_img[proj_y, proj_x] = scan_info
+
+        idx_map = np.full((self.H, self.W), -1, dtype=np.int32)
+        idx_map[proj_y, proj_x] = ordered_indices
+        self.projection.inverse_projection['idx_map'] = idx_map
         
         if label is not None:
             frame_img = projections_img[:,:,:-2]
@@ -272,7 +298,7 @@ class ProjectionTransform(nn.Module):
         }
         return item
 
-# %% ../nbs/00_behley2019iccv.ipynb 27
+# %% ../nbs/00_behley2019iccv.ipynb 29
 class ProjectionVizTransform(nn.Module):
     "Pytorch transform to preprocess projection images for proper visualization."
     def __init__(self, color_map_rgb_np, learning_map_inv_np, scaling_values):
@@ -318,20 +344,7 @@ class ProjectionVizTransform(nn.Module):
         }
         return item
 
-# %% ../nbs/00_behley2019iccv.ipynb 29
-def plot_projections(img, label, channels_names):
-    assert len(channels_names) == img.shape[-1]
-    channels = [img[:,:,i] for i in range(len(channels_names))]
-    if label is not None:
-        channels_names.append('label')
-        channels.append(label)
-    fig, axs = plt.subplots(len(channels_names), 1, figsize=(20,10), layout='compressed')
-    for ax, channel, title in zip(axs, channels, channels_names):
-        ax.imshow(channel)
-        ax.set_title(title)
-        ax.axis('off')
-
-# %% ../nbs/00_behley2019iccv.ipynb 34
+# %% ../nbs/00_behley2019iccv.ipynb 36
 class ProjectionToTensorTransform(nn.Module):
     "Pytorch transform that converts the projections from np.array to torch.tensor. It also changes the frame image format from (H, W, C) to (C, H, W)."
     def forward(self, item):
@@ -342,7 +355,7 @@ class ProjectionToTensorTransform(nn.Module):
         frame_img = np.transpose(frame_img, (2, 0, 1))
         frame_img = torch.from_numpy(frame_img).float()
         if label_img is not None:
-            label_img = torch.from_numpy(label_img).long()
+            label_img = torch.from_numpy(label_img)
         if mask_img is not None:
             mask_img = torch.from_numpy(mask_img)
 
@@ -353,43 +366,72 @@ class ProjectionToTensorTransform(nn.Module):
         }
         return item
 
-# %% ../nbs/00_behley2019iccv.ipynb 51
-def get_benchmarking_dls(
-    data_path,
-    proj_style='unfold',
-    proj_kargs={'W': 512, 'H': 64},
-    remapping_rules=None,
-    train_batch_size=8, 
-    val_batch_size=16,
-    num_workers=8,
-    aug_pre_tfms=None,
-    aug_post_tfms=None
-):
-    proj_class = {
-        'unfold': UnfoldingProjection,
-        'spherical': SphericalProjection
-    }
-    assert proj_style in proj_class.keys()
-    proj = proj_class[proj_style](**proj_kargs)
+# %% ../nbs/00_behley2019iccv.ipynb 53
+class SemanticSegmentationLDM(LightningDataModule):
+    "Lightning DataModule to facilitate reproducibility of experiments."
+    def __init__(self, 
+                 proj_style='unfold',
+                 proj_kargs={'W': 512, 'H': 64},
+                 remapping_rules=None,
+                 train_batch_size=8, 
+                 eval_batch_size=16,
+                 num_workers=8,
+                 aug_tfms=None
+                ):
+        super().__init__()
 
-    val_tfms = v2.Compose([
-        ProjectionTransform(proj),
-        ProjectionToTensorTransform(),
-    ])
-    if aug_pre_tfms is None:
-        aug_pre_tfms = nn.Identity()
-    if aug_post_tfms is None:
-        aug_post_tfms = nn.Identity()
-    train_tfms = v2.Compose([
-        aug_pre_tfms,
-        val_tfms,
-        aug_post_tfms
-    ])
+        proj_class = {
+            'unfold': UnfoldingProjection,
+            'spherical': SphericalProjection
+        }
+        assert proj_style in proj_class.keys()
+        self.proj = proj_class[proj_style](**proj_kargs)
+        self.remapping_rules = remapping_rules
+        self.train_batch_size = train_batch_size
+        self.eval_batch_size = eval_batch_size
+        self.num_workers = num_workers
+        self.aug_tfms = aug_tfms
     
-    train_ds = SemanticKITTIDataset(data_path, 'train', train_tfms, remapping_rules=remapping_rules)
-    train_dl = DataLoader(train_ds, batch_size=train_batch_size, num_workers=num_workers, shuffle=True, drop_last=True)
-    
-    val_ds = SemanticKITTIDataset(data_path, 'valid', val_tfms, remapping_rules=remapping_rules)
-    val_dl = DataLoader(val_ds, batch_size=val_batch_size, num_workers=num_workers)
-    
-    return train_dl, val_dl
+    def setup(self, stage: str):
+        data_path = '/workspace/data'
+        tfms = v2.Compose([
+            ProjectionTransform(self.proj),
+            ProjectionToTensorTransform(),
+        ])
+        if stage == 'fit':
+            split = 'train'
+        else:
+            split = 'test'
+        
+        ds = SemanticKITTIDataset(data_path, split, transform=tfms)
+        if self.remapping_rules:
+            ds.learning_remap(self.remapping_rules)
+        if not hasattr(self, 'viz_tfm'):
+            self.viz_tfm = ProjectionVizTransform(ds.color_map_rgb_np, ds.learning_map_inv_np)
+        
+        if stage == 'fit':
+            if self.aug_tfms:
+                ds.set_transform(v2.Compose([self.aug_tfms, tfms]))
+            self.ds_train = ds
+            
+            self.ds_val = SemanticKITTIDataset(data_path, 'valid', tfms)
+            if self.remapping_rules:
+                self.ds_val.learning_remap(self.remapping_rules)
+        
+        if stage == 'test':
+            self.ds_test = ds
+        if stage == 'predict':
+            self.ds_predict = ds
+            
+
+    def train_dataloader(self):
+        return DataLoader(self.ds_train, batch_size=self.train_batch_size, num_workers=self.num_workers, shuffle=True, drop_last=True)
+
+    def val_dataloader(self):
+        return DataLoader(self.ds_val, batch_size=self.eval_batch_size, num_workers=self.num_workers)
+
+    def test_dataloader(self):
+        return DataLoader(self.ds_test, batch_size=self.eval_batch_size, num_workers=self.num_workers)
+
+    def predict_dataloader(self):
+        return DataLoader(self.ds_predict, batch_size=self.eval_batch_size, num_workers=self.num_workers)
