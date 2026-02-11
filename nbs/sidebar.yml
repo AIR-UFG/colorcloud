@@ -2,5 +2,9 @@ website:
   sidebar:
     contents:
       - index.ipynb
-      - 00_datatools.ipynb
-      - 01_models.ipynb
+      - 00_behley2019iccv.ipynb
+      - 01_biasutti2019riu.ipynb
+      - 02_chen2020mvlidarnet.ipynb
+      - 10_braga2025AIRCloud.ipynb
+      - 11_braga2025format.ipynb
+      - 12_braga2024annotation.ipynb
