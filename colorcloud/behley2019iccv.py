@@ -215,16 +215,23 @@ class UnfoldingProjection:
 # %% ../nbs/00_behley2019iccv.ipynb 22
 class ProjectionTransform(nn.Module):
     "Pytorch transform that turns a point cloud frame and its respective label and mask arrays into images in given projection style."
-    def __init__(self, projection):
+    def __init__(self, projection, return_original=False):
         super().__init__()
         self.projection = projection
         self.W = projection.W
         self.H = projection.H
+        self.return_original = return_original
         
     def forward(self, item):
         frame = item['frame']
         label = item['label']
         mask = item['mask']
+        
+        # keep original indices for mapping labels back to point cloud order
+        original_len = frame.shape[0]
+        orig_indices = np.arange(original_len, dtype=np.int32)
+        if self.return_original:
+            frame_original = frame.copy()
         
         # get point_cloud components
         scan_xyz = frame[:,:3]
@@ -233,9 +240,6 @@ class ProjectionTransform(nn.Module):
         assert reflectance.max() <= 1.
         assert reflectance.min() >= 0.
 
-        # keep original point indices for z-buffer mapping
-        orig_indices = np.arange(scan_xyz.shape[0], dtype=np.int32)
-        
         # get depths of all points
         depth = np.linalg.norm(scan_xyz, 2, axis=1)
 
@@ -249,13 +253,14 @@ class ProjectionTransform(nn.Module):
             scan_xyz = scan_xyz[~outliers]
             reflectance = reflectance[~outliers]
             depth = depth[~outliers]
-            orig_indices  = orig_indices[~outliers]
+            orig_indices = orig_indices[~outliers]
             if label is not None:
                 label = label[~outliers]
                 mask = mask[~outliers]
         
         # order in decreasing depth
         order = np.argsort(depth)[::-1]
+        ordered_indices = orig_indices[order]
         info_list = [
             scan_xyz,
             reflectance[..., np.newaxis],
@@ -269,17 +274,15 @@ class ProjectionTransform(nn.Module):
         scan_info = scan_info[order]
         proj_y = proj_y[order]
         proj_x = proj_x[order]
-        # also reorder original indices
-        ordered_indices = orig_indices[order]
         
         # setup the image tensor
         projections_img = np.zeros((self.H, self.W, 2+len(info_list)), dtype=np.float32)
         projections_img[:,:,-1] -= 1 # this helps to identify points in the projection with no LiDAR readings
         projections_img[proj_y, proj_x] = scan_info
-
+        
+        # idx_map[py, px] = original point index that won this pixel (for mapping labels back)
         idx_map = np.full((self.H, self.W), -1, dtype=np.int32)
         idx_map[proj_y, proj_x] = ordered_indices
-        self.projection.inverse_projection['idx_map'] = idx_map
         
         if label is not None:
             frame_img = projections_img[:,:,:-2]
@@ -295,7 +298,11 @@ class ProjectionTransform(nn.Module):
             'frame': frame_img,
             'label': label_img,
             'mask': mask_img,
+            'idx_map': idx_map,
+            'original_len': original_len,
         }
+        if self.return_original:
+            item['frame_original'] = frame_original
         return item
 
 # %% ../nbs/00_behley2019iccv.ipynb 29
